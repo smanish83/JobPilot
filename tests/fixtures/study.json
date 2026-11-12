@@ -1,0 +1,45 @@
+{
+ "summary": "Strong on Playwright, API testing and CI/CD. Focus on Kubernetes basics and AWS for test environments.",
+ "study_plan": [
+  "Day 1: Kubernetes basics",
+  "Day 2: Playwright fixtures and sharding",
+  "Day 3: mock interview"
+ ],
+ "topics": [
+  {
+   "topic": "Kubernetes basics for test environments",
+   "priority": "High",
+   "why": "Mentioned in the posting; not in your resume.",
+   "what_to_learn": [
+    "Pods, deployments and services",
+    "kubectl logs and port-forward"
+   ],
+   "practice": "Run a test app on minikube.",
+   "search_query": "kubernetes basics for testers",
+   "official_docs": "https://kubernetes.io/docs/home/"
+  },
+  {
+   "topic": "Playwright fixtures and sharding",
+   "priority": "Medium",
+   "why": "Core tool; deepen your strength.",
+   "what_to_learn": [
+    "Custom fixtures",
+    "--shard in CI"
+   ],
+   "practice": "Shard a suite across 3 GitHub Actions jobs.",
+   "search_query": "playwright fixtures sharding tutorial",
+   "official_docs": "https://made-up.example/not-real"
+  },
+  {
+   "topic": "Behavioral stories",
+   "priority": "Low",
+   "why": "Every interview asks.",
+   "what_to_learn": [
+    "STAR format"
+   ],
+   "practice": "Write 5 STAR stories.",
+   "search_query": "STAR method interview answers",
+   "official_docs": ""
+  }
+ ]
+}

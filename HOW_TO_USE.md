@@ -30,6 +30,8 @@ This guide assumes setup is done (see SETUP.md). Run every command from a termin
 | `jobpilot tailor "<link>" --ignore-fit` | Creates the application even if the job fails the fit check or your conditions |
 | `jobpilot rules` / `jobpilot rules --edit` | Shows / edits your experience rules |
 | `jobpilot settings` / `jobpilot settings --edit` | Shows / edits your configuration file (documents, formats, page limit, conditions, API key) |
+| `jobpilot tailor "<link>" --study --questions` | Also makes a study guide and an interview Q&A for the job (see section 10) |
+| `jobpilot study "applications\<folder>"` | Study guide (and `--questions`) for an application you already have |
 | `jobpilot render "applications\<folder>\content.json"` | Rebuilds the Word files after you edit `content.json` (no API cost) |
 | `jobpilot track` | Rebuilds or catches up the tracker from all application folders |
 | `jobpilot --version` | Shows the version |
@@ -105,6 +107,7 @@ A folder for each job, named with the date and the job:
 | **Resume_...docx** | Tailored resume: headline with the posting's job title, summary, Core Skills, experience, Professional Development, Education |
 | **CoverLetter_...docx** | 250-350 words, written from the tailored resume, addressed to the hiring manager |
 | **JobRequirements_...docx** | Job details (location, remote/hybrid, pay, sponsorship), each requirement marked **Meets / Partial / Gap** with evidence from your resume, keywords found and missing, the ATS checklist, gaps to prepare for, likely interview topics, and the **full original posting** (useful if it is taken down before your interview) |
+| **StudyGuide_...pdf**, **InterviewQA_...pdf** | Only when you ask for them: topics to learn with course and video links, and likely interview questions with answers (section 10) |
 | **content.json** | Everything that was generated. Edit it and run `jobpilot render` to rebuild the Word files without another API call. |
 
 Folder and file names drop bracketed tags such as `[Remote-US]` and special characters. Running the same job twice on the same day creates a `_2` folder instead of overwriting the first.
@@ -161,7 +164,10 @@ Everything you can change lives in one file: `.resume_agent\settings.json` in yo
   "resume": { "max_pages": 2, "shorten_role_first": "", "drop_bachelors_if_higher_degree": true },
   "conditions": { "min_fit_score": 70, "skip_if_posting_mentions": ["security clearance"],
                   "skip_job_titles_with": ["VP", "Director"], "allowed_work_arrangements": ["Remote", "Hybrid"],
-                  "min_salary": 110000 }
+                  "min_salary": 110000 },
+  "study_material": { "enabled": false, "learning_links": true,
+                      "link_sources": ["YouTube", "Pluralsight", "LinkedIn Learning", "Coursera", "Udemy"],
+                      "interview_questions": false, "question_count": 25, "format": "pdf" }
 }
 ```
 
@@ -205,11 +211,44 @@ PDFs are made with Microsoft Word (Windows, through pywin32, which the setup ins
 
 Jobs skipped by a condition are listed in `applications\skipped_not_a_fit.csv` with the reason, like jobs that aren't a fit. `--ignore-fit` overrides the fit check and all conditions for one run.
 
+**study_material**: study guide and interview Q&A, only when you want them. See section 10.
+
 **Older settings files** (version 2.3 and earlier) are upgraded automatically the next time you run `jobpilot settings`: your values are kept, the new options are added, and the old file is saved as `settings.json.bak`.
 
 The environment variables `JOBPILOT_WORK_AUTH` and `JOBPILOT_MODEL`, if set, take priority over this file.
 
-## 10. Salary guidance
+## 10. Study material and interview prep
+
+JobPilot can also help you prepare, **only when you ask for it**. Nothing extra is made (or paid for) otherwise.
+
+| You want | How |
+|---|---|
+| A study guide for one run | `jobpilot tailor "<link>" --study` |
+| The interview Q&A for one run | `jobpilot tailor "<link>" --questions` (add `--study` for both) |
+| Study material for every job | Set `"enabled": true` (and `"interview_questions": true` for the Q&A) in the `study_material` section of the configuration file |
+| Study material for a job you already have | `jobpilot study "applications\2026-11-12_Acme_QA_Engineer"` (add `--questions`, or `--questions-only`). Part of the folder name works too: `jobpilot study Acme` |
+| No study material this run, although the configuration turns it on | `--no-study` |
+
+**StudyGuide_...pdf** lists 6-12 topics for *this* job, most important first: your Gap and Partial requirements, the job's core tools, then what interviewers will probe. Each topic says why it matters, what exactly to learn, a small hands-on exercise, and **links**:
+- the official documentation, when the tool has it (each link is checked when the guide is made, so it never points to a page that doesn't exist);
+- searches for the topic on **YouTube, Pluralsight, LinkedIn Learning, Coursera and Udemy** (pick the sites in `link_sources`). Search links always work and show the newest courses; choose a recent, well-rated one. Pluralsight, LinkedIn Learning, Coursera and Udemy may need a subscription or a free trial.
+
+It starts with a short day-by-day study plan.
+
+**InterviewQA_...pdf** has the questions you are most likely to be asked for this job, with model answers written from **your own resume**: technical, scenario, behavioral (STAR format) and questions about your gaps (answered honestly: what related experience you have and how you'd close the gap). Each has a tip on what the interviewer is really checking. Practice them out loud and make them your own.
+
+Each document is one extra model call. The settings are in the `study_material` section:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Make a study guide for every job |
+| `learning_links` | `true` | Add course and video links to each topic |
+| `link_sources` | all five | Any of `YouTube`, `Pluralsight`, `LinkedIn Learning`, `Coursera`, `Udemy`, `freeCodeCamp` |
+| `interview_questions` | `false` | Also make the Interview Q&A for every job (with `enabled`) and for `jobpilot study` |
+| `question_count` | `25` | How many questions (5-60) |
+| `format` | `pdf` | `pdf`, `docx` or `both` (PDFs need Microsoft Word or LibreOffice; otherwise you get the Word file) |
+
+## 11. Salary guidance
 
 When a posting lists a maximum salary, JobPilot suggests what to ask for:
 
@@ -223,7 +262,7 @@ When a posting lists a maximum salary, JobPilot suggests what to ask for:
 
 It also gives a **range to quote**, starting at the suggested ask. If a posting lists several ranges (by location, or a target and a full range), the first one is used and you are told to check which applies to you. These numbers come only from the posting. Compare them with market data for your city and role, and weigh bonus, equity and benefits, before you negotiate.
 
-## 11. The application tracker
+## 12. The application tracker
 
 `Job_Application_Tracker.xlsx` is created next to your `applications` folder and updated after every run.
 
@@ -233,21 +272,21 @@ It also gives a **range to quote**, starting at the suggested ask. If a posting 
 - The **Summary** tab counts applications by status and shows your interview rate and average keyword coverage.
 - **Close the tracker before running JobPilot.** If it was open, the documents are still created; run `jobpilot track` afterwards to catch up.
 
-## 12. Editing and rebuilding
+## 13. Editing and rebuilding
 
 Want to change a bullet, the summary or a cover-letter paragraph? Edit `content.json` in the job's folder (any text editor; keep the quotes and commas), then run:
 ```
 jobpilot render "applications\2026-10-29_Acme_Corp_Senior_SDET\content.json"
 ```
-This rebuilds the three Word files and refreshes the tracker, with no API call. You can also simply edit the Word files directly.
+This rebuilds the documents (including any study guide and interview Q&A) and refreshes the tracker, with no API call. You can also simply edit the Word files directly.
 
-## 13. Honesty and privacy
+## 14. Honesty and privacy
 
 - JobPilot is instructed never to invent employers, titles, dates, degrees, certifications, tools or metrics. **Still, read everything before sending.**
 - Your resume and the job posting are sent to the Anthropic API to generate the documents. Nothing else is sent anywhere.
 - Your personal files stay on your computer, in `.resume_agent` and your `applications` folder. Don't put your API key in shared files.
 
-## 14. FAQ
+## 15. FAQ
 
 **Can I use it for any profession?** Yes. Nothing is tied to one field; it works from your resume and the posting.
 
@@ -255,4 +294,4 @@ This rebuilds the three Word files and refreshes the tracker, with no API call. 
 
 **It says "Gap" for something I've done.** Add it to your base resume (or an experience rule) and run `tailor` again.
 
-**How much does it cost?** Each application makes three model calls. The exact cost depends on the model and the length of your resume and the posting; check your usage in the Anthropic Console.
+**How much does it cost?** Each application makes three model calls (two without a cover letter), plus one each for a study guide and an interview Q&A if you ask for them. The exact cost depends on the model and the length of your resume and the posting; check your usage in the Anthropic Console.

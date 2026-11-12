@@ -11,6 +11,7 @@ Give JobPilot a job link (LinkedIn, Indeed or a company careers page) or a saved
 | `Resume_<Company>_<Job>.docx` | Your resume rewritten for this job, using only what is in your own resume, and checked against ATS rules |
 | `CoverLetter_<Company>_<Job>.docx` | A cover letter for this job, written from that tailored resume |
 | `JobRequirements_<Company>_<Job>.docx` | The job broken down: requirements you meet / partly meet / miss, keywords, salary, a suggested salary ask, likely interview topics and the full original posting |
+| `StudyGuide_...pdf`, `InterviewQA_...pdf` | Only if you ask: what to learn for this job, with links, and likely interview questions with model answers |
 
 Every application is also added to **`Job_Application_Tracker.xlsx`**, where you track status, follow-ups, contacts and the salary you asked for.
 
@@ -24,7 +25,8 @@ Every application is also added to **`Job_Application_Tracker.xlsx`**, where you
 - **Salary guidance.** When a posting lists a maximum, it suggests what to ask for and records it in the tracker.
 - **No duplicates.** Jobs you've already prepared or applied for are recognized by their link and skipped.
 - **Skips jobs that aren't a fit.** Before writing anything, it scores how well the job matches your real experience. A VP role, "automation" that means ATM or factory equipment, or a must-have stack you've never used scores below 70%, so it is skipped with the reason, and you save the time and API cost.
-- **Configurable.** One configuration file decides whether you get a cover letter, Word or PDF (or both) for each document, the page limit, which jobs to skip (titles such as VP, on-site jobs, pay below your minimum, words like "security clearance") and, optionally, your API key.
+- **Study material, when you ask.** For any job: a study guide with the topics to learn (gaps first), hands-on exercises and links to the official docs and to courses and videos on YouTube, Pluralsight, LinkedIn Learning, Coursera and Udemy, plus an optional PDF of likely interview questions with answers based on your resume.
+- **Configurable.** One configuration file decides whether you get a cover letter, Word or PDF (or both) for each document, the page limit, which jobs to skip (titles such as VP, on-site jobs, pay below your minimum, words like "security clearance"), whether you want study material and, optionally, your API key.
 - **Several jobs at once.** Pass several links, or a file of links, and run them one after another or in parallel.
 
 ## Quick start

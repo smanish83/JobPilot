@@ -2,6 +2,7 @@
 
 ## 2.4.0 (unreleased)
 
+- **Study material, only when asked.** `--study` adds a study guide for the job: prioritized topics (gaps first), what to learn, a hands-on exercise, and links to the official docs (each checked) and to course and video searches on YouTube, Pluralsight, LinkedIn Learning, Coursera and Udemy. `--questions` adds an Interview Q&A document with likely questions and model answers based on your resume. Both default to PDF. Turn them on for every job in the `study_material` section, make them later with `jobpilot study <folder>`, or skip them for one run with `--no-study`.
 - **Configuration file.** `settings.json` now has sections you can edit with `jobpilot settings --edit`:
   - `documents`: cover letter on or off (off also saves a model call), the JobRequirements document on or off, and `docx`, `pdf` or `both` for each document. PDFs are made with Microsoft Word or LibreOffice.
   - `resume`: page limit and how to shorten.

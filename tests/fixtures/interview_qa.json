@@ -1,0 +1,40 @@
+{
+ "questions": [
+  {
+   "category": "Technical",
+   "question": "How do you handle flaky tests in Playwright?",
+   "answer": "At Northwind Payments I cut flaky tests by 70% with stable locators, test-data factories and retries with traces.",
+   "tip": "Expect a follow-up on root causes."
+  },
+  {
+   "category": "Technical",
+   "question": "How do you structure API tests?",
+   "answer": "At Contoso Retail I built RestAssured tests run in Jenkins on every build.",
+   "tip": "Mention contract checks."
+  },
+  {
+   "category": "Scenario",
+   "question": "A release is tomorrow and 30 tests fail. What do you do?",
+   "answer": "Triage by risk, check recent changes, rerun with traces, and report status clearly.",
+   "tip": "They check prioritization."
+  },
+  {
+   "category": "Behavioral",
+   "question": "Tell me about a time you improved a process.",
+   "answer": "Situation: manual regression took days at Contoso Retail. Task: speed it up. Action: automated 800 cases with Selenium. Result: 60% faster.",
+   "tip": "Keep it under two minutes."
+  },
+  {
+   "category": "Gap",
+   "question": "Have you used Kubernetes?",
+   "answer": "Not in production. I have used Docker for test runners and I am learning Kubernetes basics with minikube.",
+   "tip": "Be honest, show a plan."
+  },
+  {
+   "category": "Behavioral",
+   "question": "How do you mentor junior QA engineers?",
+   "answer": "At Northwind Payments I mentored three engineers through pairing and code reviews.",
+   "tip": ""
+  }
+ ]
+}

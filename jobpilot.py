@@ -91,6 +91,14 @@ DEFAULT_SETTINGS = {
         "allowed_work_arrangements": [], # e.g. ["Remote", "Hybrid"]; empty = any
         "min_salary": 0,                 # yearly; skip when the posted maximum is lower (0 = off)
     },
+    "study_material": {
+        "enabled": False,                # true = a study guide for every job (or use --study / jobpilot study)
+        "learning_links": True,          # links to courses and videos for each topic
+        "link_sources": ["YouTube", "Pluralsight", "LinkedIn Learning", "Coursera", "Udemy"],
+        "interview_questions": False,    # true = also an Interview Q&A document (or use --questions)
+        "question_count": 25,
+        "format": "pdf",                 # docx, pdf or both
+    },
 }
 # Settings files from version 2.3 and earlier were flat; these keys moved into sections.
 _OLD_KEYS = {"max_resume_pages": ("resume", "max_pages"),
@@ -98,6 +106,15 @@ _OLD_KEYS = {"max_resume_pages": ("resume", "max_pages"),
              "drop_bachelors_if_higher_degree": ("resume", "drop_bachelors_if_higher_degree"),
              "min_fit_score": ("conditions", "min_fit_score")}
 DOC_FORMATS = ("docx", "pdf", "both")
+# Search pages on learning sites: always valid links, built from each topic's search words.
+LEARNING_SITES = {
+    "YouTube": "https://www.youtube.com/results?search_query={q}",
+    "Pluralsight": "https://www.pluralsight.com/search?q={q}",
+    "LinkedIn Learning": "https://www.linkedin.com/learning/search?keywords={q}",
+    "Coursera": "https://www.coursera.org/search?query={q}",
+    "Udemy": "https://www.udemy.com/courses/search/?q={q}",
+    "freeCodeCamp": "https://www.freecodecamp.org/news/search/?query={q}",
+}
 
 
 def _merge(defaults: dict, values: dict) -> dict:
@@ -154,9 +171,11 @@ def cfg(path: str, default=None):
 
 
 def doc_format(kind: str) -> str:
-    """docx, pdf or both for 'resume', 'cover_letter' or 'requirements'."""
-    value = str(cfg(f"documents.{kind}_format") or "docx").strip().lower()
-    return value if value in DOC_FORMATS else "docx"
+    """docx, pdf or both for 'resume', 'cover_letter', 'requirements' or 'study'."""
+    setting = "study_material.format" if kind == "study" else f"documents.{kind}_format"
+    default = "pdf" if kind == "study" else "docx"
+    value = str(cfg(setting) or default).strip().lower()
+    return value if value in DOC_FORMATS else default
 
 
 def work_auth() -> str:
@@ -177,7 +196,15 @@ def settings_problems() -> list[str]:
         value = str(cfg(f"documents.{kind}_format") or "docx").strip().lower()
         if value not in DOC_FORMATS:
             problems.append(f'documents.{kind}_format is "{value}": use "docx", "pdf" or "both" (using docx).')
-    for path in ("conditions.min_fit_score", "conditions.min_salary", "resume.max_pages"):
+    study_format = str(cfg("study_material.format") or "pdf").strip().lower()
+    if study_format not in DOC_FORMATS:
+        problems.append(f'study_material.format is "{study_format}": use "docx", "pdf" or "both" (using pdf).')
+    unknown = [s for s in cfg("study_material.link_sources", []) or [] if s not in LEARNING_SITES]
+    if unknown:
+        problems.append(f"study_material.link_sources: unknown {', '.join(map(str, unknown))} "
+                        f"(choose from {', '.join(LEARNING_SITES)}).")
+    for path in ("conditions.min_fit_score", "conditions.min_salary", "resume.max_pages",
+                 "study_material.question_count"):
         try:
             float(cfg(path) or 0)
         except (TypeError, ValueError):
@@ -331,6 +358,46 @@ Return ONLY one JSON object, no other text, exactly in this shape:
   "certifications": [],
   "professional_development": ["Title (Self-Directed, YYYY): what was learned"]
 }
+"""
+
+STUDY_PROMPT = """You are a senior interview coach and technical mentor. Build a focused study plan that
+prepares the candidate for THIS job's interviews, based on the job analysis and the candidate's resume.
+
+Rules:
+- Prioritize: requirements marked Gap or Partial first, then the job's core tools and the likely interview
+  topics, then refreshers on strengths the interview will probe. 6-12 topics.
+- Be concrete: name the exact concepts, APIs, commands or patterns to learn, not vague areas.
+- search_query: 3-7 words that would find a good course or video on the topic (e.g. "playwright fixtures
+  parallel tests tutorial"). No site names in it.
+- official_docs: the official documentation URL for the tool or standard, ONLY if you are sure it exists
+  (e.g. "https://playwright.dev/docs/intro"); otherwise "". Never invent course or video URLs.
+- practice: one small hands-on exercise the candidate can finish in a few hours.
+- Never claim the candidate has experience that is not in the resume.
+
+Return ONLY one JSON object, no other text, exactly in this shape:
+{
+  "summary": "2-3 sentences: where the candidate is strong for this job and what to focus on",
+  "study_plan": ["Day 1: ...", "Day 2: ..."],
+  "topics": [{"topic": "...", "priority": "High|Medium|Low", "why": "why this job needs it, and the candidate's gap or strength",
+              "what_to_learn": ["...", "..."], "practice": "...", "search_query": "...", "official_docs": "https://... or empty"}]
+}
+"""
+
+QA_PROMPT = """You are a senior interview coach. Write the interview questions this candidate is most likely to be
+asked for THIS job, with strong model answers in the candidate's own voice.
+
+Rules:
+- Mix: role-specific technical questions from the posting's tools and duties, scenario and problem-solving
+  questions, behavioral questions, and questions that probe the candidate's gaps.
+- Answers must be grounded ONLY in the candidate's resume: use real employers, projects, tools and numbers from
+  it. Behavioral answers use STAR (Situation, Task, Action, Result) in 4-7 sentences.
+- For a gap, answer honestly: what related experience the candidate has and how they would close the gap.
+  Never invent experience, employers, tools or metrics.
+- Technical answers explain the concept correctly and concisely, then connect it to the candidate's work.
+- tip: one short line on what the interviewer is really checking, or a follow-up to expect.
+
+Return ONLY one JSON object, no other text, exactly in this shape:
+{"questions": [{"category": "Technical|Scenario|Behavioral|Gap", "question": "...", "answer": "...", "tip": "..."}]}
 """
 
 COVER_LETTER_PROMPT = """You are an expert career writer. Write a cover letter for the job, based ONLY on
@@ -836,6 +903,84 @@ def generate(base_resume: str, job_text: str, rules_text: str = "", after_analys
     return {**analysis, **resume, "cover_letter": letter}
 
 
+def _check_study(d: dict):
+    topics = d.get("topics")
+    if not isinstance(topics, list) or not topics:
+        return "topics are missing"
+    if not all(isinstance(x, dict) and x.get("topic") and x.get("search_query") for x in topics):
+        return "every topic needs a topic name and a search_query"
+    return None
+
+
+def _make_check_qa(minimum: int):
+    def check(d: dict):
+        questions = d.get("questions")
+        if not isinstance(questions, list) or len(questions) < minimum:
+            return f"at least {minimum} questions are needed"
+        if not all(isinstance(q, dict) and q.get("question") and q.get("answer") for q in questions):
+            return "every question needs a question and an answer"
+        return None
+    return check
+
+
+def _url_works(url: str) -> bool:
+    """Checked once when the study guide is made, so the guide never links to a page that doesn't exist."""
+    if not re.match(r"https://[^\s/]+\.[^\s]+$", url or ""):
+        return False
+    try:
+        import requests
+        response = requests.get(url, headers=HEADERS, timeout=8, allow_redirects=True, stream=True)
+        response.close()
+        return response.status_code < 400
+    except Exception:
+        return False
+
+
+def learning_links(topic: dict) -> list[dict]:
+    """Official docs (only if the page really exists), then search pages on the learning sites you chose."""
+    from urllib.parse import quote_plus
+    links = []
+    docs = str(topic.get("official_docs") or "").strip()
+    if docs and _url_works(docs):
+        links.append({"label": "Official documentation", "url": docs})
+    query = quote_plus(str(topic.get("search_query") or topic.get("topic") or "").strip())
+    if query:
+        for site in cfg("study_material.link_sources", []) or []:
+            if site in LEARNING_SITES:
+                links.append({"label": site, "url": LEARNING_SITES[site].format(q=query)})
+    return links
+
+
+def generate_study(data: dict, guide: bool = True, questions: bool = False) -> dict:
+    """The study guide and/or interview Q&A for one application (one model call each)."""
+    import anthropic
+    client = anthropic.Anthropic()
+    analysis = {k: data.get(k) for k in ("company", "job_title", "job_location", "job_requirements", "gaps", "fit")}
+    resume = {k: data.get(k) for k in ("headline", "summary", "skills", "experience", "education",
+                                       "certifications", "professional_development")}
+    shared = (f"<job_analysis>\n{json.dumps(analysis, indent=1)}\n</job_analysis>\n\n"
+              f"<candidate_resume>\n{json.dumps(resume, indent=1)}\n</candidate_resume>\n\n"
+              f"<job_posting>\n{data.get('job_description_raw', '')}\n</job_posting>\n\n")
+    result = {}
+    if guide:
+        log("  Study guide: picking the topics to learn...")
+        study = _ask_json(client, STUDY_PROMPT, shared + "Build the study plan.", _check_study, "study guide")
+        if cfg("study_material.learning_links", True):
+            for topic in study["topics"]:
+                topic["links"] = learning_links(topic)
+        result["study"] = study
+    if questions:
+        try:
+            count = max(5, min(60, int(cfg("study_material.question_count") or 25)))
+        except (TypeError, ValueError):
+            count = 25
+        log(f"  Interview Q&A: writing {count} likely questions with answers...")
+        qa = _ask_json(client, QA_PROMPT, shared + f"Write {count} questions with model answers.",
+                       _make_check_qa(min(count, 5)), "interview questions", max_tokens=16000)
+        result["interview_qa"] = qa
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Word document builders
 # ---------------------------------------------------------------------------
@@ -1214,6 +1359,140 @@ def build_requirements(data: dict, path: Path):
 # ---------------------------------------------------------------------------
 # Saving everything
 # ---------------------------------------------------------------------------
+def add_hyperlink(paragraph, text: str, url: str):
+    """A clickable link in a Word paragraph (python-docx has no built-in helper)."""
+    rel_id = paragraph.part.relate_to(url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+                                      is_external=True)
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), rel_id)
+    run = OxmlElement("w:r")
+    props = OxmlElement("w:rPr")
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), "1F5FBF")
+    underline = OxmlElement("w:u")
+    underline.set(qn("w:val"), "single")
+    props.append(color)
+    props.append(underline)
+    run.append(props)
+    text_el = OxmlElement("w:t")
+    text_el.text = clean_xml_text(text)
+    text_el.set(qn("xml:space"), "preserve")
+    run.append(text_el)
+    link.append(run)
+    paragraph._p.append(link)
+
+
+def _doc_title(doc, title: str, subtitle: str):
+    p = doc.add_paragraph()
+    run = p.add_run(clean_xml_text(title))
+    run.bold, run.font.size, run.font.color.rgb = True, Pt(18), ACCENT
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(6)
+    run = p.add_run(clean_xml_text(subtitle))
+    run.font.size, run.font.color.rgb = Pt(11), GRAY
+
+
+PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def build_study_guide(data: dict, path: Path):
+    study = data["study"]
+    doc = new_document(10.5)
+    _doc_title(doc, f"Study Guide: {data['job_title']}", f"{data['company']}  |  prepared for {data.get('name', '')}")
+    if data.get("fit_score") is not None:
+        p = doc.add_paragraph()
+        p.add_run("Role fit: ").bold = True
+        p.add_run(f"{data['fit_score']}%")
+    if study.get("summary"):
+        add_section_heading(doc, "Where You Stand")
+        doc.add_paragraph(clean_xml_text(study["summary"]))
+    if study.get("study_plan"):
+        add_section_heading(doc, "Study Plan")
+        for step in study["study_plan"]:
+            doc.add_paragraph(clean_xml_text(step), style="List Bullet")
+    topics = sorted(study.get("topics", []),
+                    key=lambda x: PRIORITY_ORDER.get(str(x.get("priority", "")).lower(), 3))
+    add_section_heading(doc, "Topics to Learn")
+    for n, topic in enumerate(topics, 1):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(8)
+        p.paragraph_format.keep_with_next = True
+        run = p.add_run(f"{n}. {clean_xml_text(topic['topic'])}")
+        run.bold, run.font.size, run.font.color.rgb = True, Pt(11.5), ACCENT
+        if topic.get("priority"):
+            run = p.add_run(f"   {topic['priority']} priority")
+            run.font.size, run.font.color.rgb = Pt(9.5), GRAY
+        if topic.get("why"):
+            p = doc.add_paragraph()
+            p.add_run("Why: ").bold = True
+            p.add_run(clean_xml_text(topic["why"]))
+        for item in _str_list(topic.get("what_to_learn")):
+            doc.add_paragraph(clean_xml_text(item), style="List Bullet")
+        if topic.get("practice"):
+            p = doc.add_paragraph()
+            p.add_run("Practice: ").bold = True
+            p.add_run(clean_xml_text(topic["practice"]))
+        if topic.get("links"):
+            p = doc.add_paragraph()
+            p.add_run("Learn: ").bold = True
+            for i, link in enumerate(topic["links"]):
+                if i:
+                    p.add_run("  |  ")
+                add_hyperlink(p, link["label"], link["url"])
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(10)
+    run = p.add_run("Course and video links open a search on each site for the topic; pick a recent, well-rated "
+                    "result. Pluralsight, LinkedIn Learning, Coursera and Udemy courses may need a subscription "
+                    "or a free trial (many public libraries offer LinkedIn Learning for free).")
+    run.italic, run.font.size, run.font.color.rgb = True, Pt(9), GRAY
+    set_properties(doc, author=data.get("name", ""), title=f"Study Guide - {data['job_title']} - {data['company']}")
+    doc.save(path)
+
+
+def build_interview_qa(data: dict, path: Path):
+    questions = data["interview_qa"].get("questions", [])
+    doc = new_document(10.5)
+    _doc_title(doc, f"Interview Questions and Answers: {data['job_title']}",
+               f"{data['company']}  |  {len(questions)} likely questions, with answers based on your resume")
+    p = doc.add_paragraph()
+    run = p.add_run("Practice these out loud. Make each answer your own: interviewers notice memorized answers, and "
+                    "they will ask follow-ups about every example.")
+    run.italic, run.font.size, run.font.color.rgb = True, Pt(9.5), GRAY
+    order = ["Technical", "Scenario", "Behavioral", "Gap"]
+    groups = {}
+    for q in questions:
+        groups.setdefault(str(q.get("category") or "Other").strip().title(), []).append(q)
+    n = 0
+    for category in sorted(groups, key=lambda c: order.index(c) if c in order else len(order)):
+        add_section_heading(doc, {"Gap": "Questions About Your Gaps"}.get(category, f"{category} Questions"))
+        for q in groups[category]:
+            n += 1
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(7)
+            p.paragraph_format.keep_with_next = True
+            p.add_run(f"Q{n}. {clean_xml_text(q['question'])}").bold = True
+            p = doc.add_paragraph(clean_xml_text(q["answer"]))
+            p.paragraph_format.left_indent = Inches(0.2)
+            if q.get("tip"):
+                p = doc.add_paragraph()
+                p.paragraph_format.left_indent = Inches(0.2)
+                run = p.add_run("Tip: " + clean_xml_text(q["tip"]))
+                run.italic, run.font.size, run.font.color.rgb = True, Pt(9.5), GRAY
+    set_properties(doc, author=data.get("name", ""), title=f"Interview Q&A - {data['job_title']} - {data['company']}")
+    doc.save(path)
+
+
+def write_study_documents(data: dict, folder: Path, job_name: str) -> list[Path]:
+    made = []
+    if data.get("study", {}).get("topics"):
+        build_study_guide(data, folder / f"StudyGuide_{job_name}.docx")
+        made.append(folder / f"StudyGuide_{job_name}.docx")
+    if data.get("interview_qa", {}).get("questions"):
+        build_interview_qa(data, folder / f"InterviewQA_{job_name}.docx")
+        made.append(folder / f"InterviewQA_{job_name}.docx")
+    return made
+
+
 def slug(text: str) -> str:
     """File/folder-safe name: drops tags in brackets like [Remote-US] or (Hybrid), then turns every
     comma, dash, slash, ampersand or other special character into a single underscore."""
@@ -1427,7 +1706,8 @@ def convert_to_pdf(path: Path) -> Path | None:
 
 def export_formats(folder: Path, job_name: str):
     """Make PDF copies (or PDF only) of the documents as the configuration asks."""
-    for kind, prefix in (("resume", "Resume"), ("cover_letter", "CoverLetter"), ("requirements", "JobRequirements")):
+    for kind, prefix in (("resume", "Resume"), ("cover_letter", "CoverLetter"), ("requirements", "JobRequirements"),
+                         ("study", "StudyGuide"), ("study", "InterviewQA")):
         fmt = doc_format(kind)
         docx = folder / f"{prefix}_{job_name}.docx"
         if fmt == "docx" or not docx.exists():
@@ -1464,6 +1744,7 @@ def write_application(data: dict, folder: Path | None = None) -> Path:
             build_cover_letter(data, folder / f"CoverLetter_{job_name}.docx")
         if cfg("documents.requirements_document", True):
             build_requirements(data, folder / f"JobRequirements_{job_name}.docx")
+        write_study_documents(data, folder, job_name)
         export_formats(folder, job_name)
     except Exception:
         print(f"\nBuilding the Word files failed. The generated content is saved in:\n  {content_path}\n"
@@ -2228,6 +2509,12 @@ SETTING_HELP = {
     "conditions.skip_job_titles_with": 'Skip job titles containing any of these, e.g. ["VP", "Director"]',
     "conditions.allowed_work_arrangements": 'Only these, e.g. ["Remote", "Hybrid"] ([] = any)',
     "conditions.min_salary": "Skip jobs whose posted maximum (yearly) is below this (0 = off)",
+    "study_material.enabled": "Make a study guide for every job (or use --study, or  jobpilot study <folder>)",
+    "study_material.learning_links": "Add course and video links for each topic",
+    "study_material.link_sources": f"Sites to link: {', '.join(LEARNING_SITES)}",
+    "study_material.interview_questions": "Also make an Interview Q&A document (or use --questions)",
+    "study_material.question_count": "Number of interview questions (5-60)",
+    "study_material.format": "docx, pdf or both",
 }
 
 
@@ -2549,7 +2836,18 @@ def _read_job(job: str, batch: bool) -> tuple[str, str]:
     raise JobInputError("not a URL and no such file")
 
 
-def _tailor_one(job_text: str, source: str, base_resume: str, rules: list[dict], check=None) -> dict:
+def study_wanted(args=None) -> tuple[bool, bool]:
+    """(study guide, interview Q&A): from the configuration, or --study / --questions for this run."""
+    on = bool(cfg("study_material.enabled", False))
+    guide = on or bool(getattr(args, "study", False))
+    questions = (on and bool(cfg("study_material.interview_questions", False))) or bool(getattr(args, "questions", False))
+    if getattr(args, "no_study", False):
+        guide = questions = False
+    return guide, questions
+
+
+def _tailor_one(job_text: str, source: str, base_resume: str, rules: list[dict], check=None,
+                study: tuple[bool, bool] = (False, False)) -> dict:
     """The model work for one job (safe to run in parallel threads)."""
     active = active_rules(rules, job_text)
     for rule in active:
@@ -2564,6 +2862,11 @@ def _tailor_one(job_text: str, source: str, base_resume: str, rules: list[dict],
     data["fit_score"] = fit_score(data)
     data["applied_date"] = date.today().isoformat()
     data["job_description_raw"] = job_text
+    if any(study):
+        try:
+            data.update(generate_study(data, *study))
+        except Exception as err:  # the application itself is still good
+            log(f"Note: the study material could not be made ({err}). Later run:  jobpilot study <folder>")
     return data
 
 
@@ -2577,7 +2880,7 @@ def _report(folder: Path, data: dict, detailed: bool):
             line += f"  |  Suggested ask: {money(saved['salary']['suggested'], saved['salary']['period'])}"
         print(line)
         return
-    for file in sorted(folder.glob("*.docx")):
+    for file in sorted(list(folder.glob("*.docx")) + list(folder.glob("*.pdf"))):
         print(f"  {file}")
     print_ats(saved.get("ats", {}))
     if saved.get("salary"):
@@ -2724,7 +3027,7 @@ def cmd_tailor(args):
     def work(index, job_text, source):
         _TASK.label = f"[{index}/{len(prepared)}]" if batch else ""
         try:
-            return _tailor_one(job_text, source, base_resume, rules, check)
+            return _tailor_one(job_text, source, base_resume, rules, check, study_wanted(args))
         finally:
             _TASK.label = ""
 
@@ -2816,11 +3119,37 @@ def print_ats(ats: dict):
                   + "; ".join(ats["phrases_missing"]))
 
 
+def cmd_study(args):
+    """Study material for an application that already exists (from its content.json)."""
+    check_api_key()
+    path = Path(args.application)
+    path = path / "content.json" if path.is_dir() else path
+    if not path.exists():
+        matches = sorted(OUTPUT_DIR.glob(f"*{args.application}*/content.json"))
+        if len(matches) != 1:
+            sys.exit(f"No application found for: {args.application}\n"
+                     'Give the folder, e.g.  jobpilot study "applications\\2026-11-12_Acme_QA_Engineer"'
+                     + (f"\n{len(matches)} folders match; be more specific." if matches else ""))
+        path = matches[0]
+    data = json.loads(path.read_text(encoding="utf-8"))
+    guide = not args.questions_only
+    questions = args.questions or args.questions_only or bool(cfg("study_material.interview_questions", False))
+    print(f"Making study material for {data.get('job_title')} at {data.get('company')}...")
+    data.update(generate_study(data, guide, questions))
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    job_name = f"{slug(data['company'])}_{slug(data['job_title'])}"
+    made = write_study_documents(data, path.parent, job_name)
+    export_formats(path.parent, job_name)
+    for doc in made:
+        for file in sorted(path.parent.glob(doc.stem + ".*")):
+            print(f"  {file}")
+
+
 def cmd_render(args):
     path = Path(args.json)
     data = json.loads(path.read_text(encoding="utf-8"))
     folder = write_application(data, path.parent)
-    print(f"Rebuilt Word files in: {folder}")
+    print(f"Rebuilt the documents in: {folder}")
     print_ats(json.loads((folder / "content.json").read_text(encoding="utf-8")).get("ats", {}))
 
 
@@ -2844,9 +3173,21 @@ def main():
     p_tailor.add_argument("--paste", action="store_true", help="Paste one job description into the terminal")
     p_tailor.add_argument("--force", action="store_true",
                           help="Create the application even if this job link was already done")
+    p_tailor.add_argument("--study", action="store_true",
+                          help="Also make a study guide with learning links for each job (see study_material settings)")
+    p_tailor.add_argument("--questions", action="store_true",
+                          help="Also make an Interview Q&A document with likely questions and model answers")
+    p_tailor.add_argument("--no-study", action="store_true",
+                          help="No study material this run, even if the configuration turns it on")
     p_tailor.add_argument("--ignore-fit", action="store_true",
                           help="Create the application even if the job fails the fit check or your conditions")
     p_tailor.set_defaults(func=cmd_tailor)
+
+    p_study = sub.add_parser("study", help="Make a study guide (and interview Q&A) for an application you already have")
+    p_study.add_argument("application", help="The application folder (or its content.json, or part of its name)")
+    p_study.add_argument("--questions", action="store_true", help="Also make the Interview Q&A document")
+    p_study.add_argument("--questions-only", action="store_true", help="Only the Interview Q&A document")
+    p_study.set_defaults(func=cmd_study)
 
     p_track = sub.add_parser("track", help="Add/refresh every application in Job_Application_Tracker.xlsx")
     p_track.set_defaults(func=cmd_track)

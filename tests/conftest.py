@@ -38,7 +38,7 @@ class FakeModel:
         self.analysis = load_fixture("analysis")
         self.resume = load_fixture("resume")
         self.letter = load_fixture("letter")
-        self.extra = {}  # prompt constant name -> reply dict, for prompts added later
+        self.extra = {"STUDY_PROMPT": load_fixture("study"), "QA_PROMPT": load_fixture("interview_qa")}
 
     def reply_for(self, system: str) -> dict:
         if system == jobpilot.ANALYZE_PROMPT:
@@ -105,6 +105,14 @@ def jp(tmp_path, monkeypatch):
     # Page counting through Word or LibreOffice is slow and machine-specific: use the estimate.
     monkeypatch.setattr(jobpilot, "_pages_with_word", lambda path: None)
     monkeypatch.setattr(jobpilot, "_pages_with_libreoffice", lambda path: None)
+    # Never reach the internet: official-docs links count as working only for these test URLs.
+    monkeypatch.setattr(jobpilot, "_url_works", lambda url: url.startswith("https://kubernetes.io/"))
+    # PDFs: a tiny stand-in file instead of Word or LibreOffice.
+    def fake_pdf(path):
+        pdf = path.with_suffix(".pdf")
+        pdf.write_bytes(b"%PDF-1.4 test")
+        return pdf
+    monkeypatch.setattr(jobpilot, "convert_to_pdf", fake_pdf)
     (home / "base_resume.txt").write_text(
         (ROOT / "examples" / "sample_resume.txt").read_text(encoding="utf-8"), encoding="utf-8")
     return jobpilot
