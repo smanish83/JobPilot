@@ -23,5 +23,9 @@ word = ["pywin32; sys_platform == 'win32'"]
 [project.scripts]
 jobpilot = "jobpilot:main"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
 [tool.setuptools]
 py-modules = ["jobpilot"]

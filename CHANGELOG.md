@@ -2,6 +2,7 @@
 
 ## 2.4.0 (unreleased)
 
+- **Automated tests.** A pytest suite (`tests/`) runs JobPilot end to end with a fake model and the sample resume: no API key or internet needed. GitHub Actions runs it on Windows and Linux with Python 3.10 and 3.13.
 - **Sample resume.** `examples/sample_resume.docx` and `.txt`: a complete resume for a fictional QA engineer that shows the expected structure. `jobpilot setup --sample` (or typing `sample` in `jobpilot init`) loads it so you can try JobPilot end to end.
 
 ## 2.3.0 (2026-11-12)

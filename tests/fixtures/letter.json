@@ -1,0 +1,10 @@
+{
+ "greeting": "Dear Hiring Manager,",
+ "paragraphs": [
+  "I am applying for the Senior QA Automation Engineer role at Example Corp.",
+  "At Northwind Payments I built a Playwright and TypeScript framework that runs 1,200 tests on every pull request in GitHub Actions.",
+  "At Contoso Retail I cut regression time by 60% by moving manual tests to Selenium and Java.",
+  "I would welcome the chance to talk about how I can help your team ship with confidence."
+ ],
+ "closing": "Sincerely,"
+}

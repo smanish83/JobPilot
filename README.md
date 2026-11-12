@@ -57,6 +57,8 @@ JobPilot/
 ├── jobpilot.bat / jobpilot   launchers (Windows / Mac-Linux)
 ├── jobpilot.py               the tool itself
 ├── requirements.txt          Python libraries it needs
+├── requirements-dev.txt      extra library for running the tests (pytest)
+├── tests/                    automated tests (no API key or internet needed)
 ├── pyproject.toml            for installing with pip instead (optional)
 ├── examples/                 a sample resume, a sample job, a jobs list and a sample experience-rules file
 ├── CHANGELOG.md              what changed in each version
@@ -75,6 +77,17 @@ Your personal data never goes in this folder's code. Your base resume, settings 
 ## Contributing
 
 Bug reports and ideas are welcome: open an issue on GitHub. For a code change, open a pull request with a short description, and never include real resumes, job applications or API keys in issues, commits or test files.
+
+### Running the tests
+
+The automated tests run JobPilot end to end with a fake model, in a temporary folder, using the sample resume. They need no API key, no internet and never touch your own resume, settings or applications.
+
+```
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest
+```
+
+They cover job-link matching, keyword and ATS checks, salary suggestions, experience rules, the fit check, duplicate detection, the tracker, parallel runs and the command line. GitHub runs them automatically on Windows and Linux for every push and pull request.
 
 ## License
 

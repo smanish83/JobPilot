@@ -5,6 +5,7 @@ __pycache__/
 build/
 dist/
 .venv/
+.pytest_cache/
 venv/
 
 # Your personal files: never commit these

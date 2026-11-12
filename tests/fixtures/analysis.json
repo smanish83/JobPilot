@@ -1,0 +1,116 @@
+{
+ "company": "Example Corp",
+ "job_title": "Senior QA Automation Engineer",
+ "job_location": "Remote (US)",
+ "job_requirements": {
+  "overview": "Build and maintain automated test frameworks for the web and API platform and run them in CI/CD.",
+  "work_arrangement": "Remote",
+  "employment_type": "Full-time",
+  "experience_level": "5+ years",
+  "compensation": "$120,000 - $140,000",
+  "salary_min": 120000,
+  "salary_max": 140000,
+  "salary_period": "year",
+  "sponsorship": "Not listed",
+  "responsibilities": [
+   "Build automated test frameworks",
+   "Integrate tests into CI/CD pipelines"
+  ],
+  "required": [
+   {
+    "requirement": "5+ years of QA automation",
+    "match": "Meets",
+    "evidence": "9 years"
+   },
+   {
+    "requirement": "Playwright or Selenium",
+    "match": "Meets",
+    "evidence": "Northwind Payments"
+   },
+   {
+    "requirement": "REST API testing",
+    "match": "Meets",
+    "evidence": "RestAssured, Postman"
+   },
+   {
+    "requirement": "CI/CD integration",
+    "match": "Meets",
+    "evidence": "GitHub Actions, Jenkins"
+   },
+   {
+    "requirement": "SQL for data validation",
+    "match": "Meets",
+    "evidence": "PostgreSQL at Contoso"
+   },
+   {
+    "requirement": "Agile/Scrum",
+    "match": "Meets",
+    "evidence": "Fabrikam"
+   }
+  ],
+  "preferred": [
+   {
+    "requirement": "k6 or JMeter",
+    "match": "Meets",
+    "evidence": "k6 at Northwind"
+   },
+   {
+    "requirement": "Docker and AWS",
+    "match": "Partial",
+    "evidence": "Docker, AWS listed"
+   }
+  ],
+  "tech_stack": [
+   "Playwright",
+   "Selenium",
+   "Python",
+   "TypeScript",
+   "REST API",
+   "Postman",
+   "RestAssured",
+   "CI/CD",
+   "GitHub Actions",
+   "Jenkins",
+   "SQL",
+   "Agile/Scrum",
+   "k6",
+   "Docker",
+   "AWS",
+   "axe-core"
+  ],
+  "required_keywords": [
+   "Playwright",
+   "Python",
+   "REST API",
+   "CI/CD",
+   "GitHub Actions",
+   "SQL",
+   "Agile/Scrum"
+  ],
+  "ats_phrases": [
+   "build and maintain automated test frameworks",
+   "embed them into CI/CD pipelines"
+  ],
+  "interview_focus": [
+   "Playwright framework design",
+   "API testing strategy",
+   "CI/CD pipelines",
+   "Flaky test handling"
+  ]
+ },
+ "matched_keywords": [
+  "Playwright",
+  "REST API",
+  "CI/CD"
+ ],
+ "gaps": [
+  "Kubernetes is not mentioned in the resume"
+ ],
+ "fit": {
+  "score": 88,
+  "role_family": "Software QA automation (SDET)",
+  "seniority": "Match",
+  "blockers": [],
+  "reason": "Core Playwright, API and CI/CD duties match."
+ }
+}
