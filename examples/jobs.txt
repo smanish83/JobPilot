@@ -1,0 +1,5 @@
+# One job per line: a job posting link or a job description file. Lines starting with # are ignored.
+# Use with:  jobpilot tailor --file examples\jobs.txt --parallel 3
+https://www.linkedin.com/jobs/view/1234567890/
+https://www.indeed.com/viewjob?jk=abc123
+my_saved_job_description.txt

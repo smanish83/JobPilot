@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jobpilot"
+version = "2.3.0"
+description = "Tailor your resume, write a cover letter and track job applications with Claude (Word output, ATS checks)"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Manish Sandbhor" }]
+keywords = ["resume", "cover letter", "ATS", "job search", "claude", "anthropic"]
+requires-python = ">=3.10"
+dependencies = ["anthropic>=0.40", "python-docx>=1.1", "requests>=2.31", "beautifulsoup4>=4.12", "pypdf>=4.0", "openpyxl>=3.1"]
+
+[project.urls]
+Homepage = "https://github.com/smanish83/JobPilot"
+Changelog = "https://github.com/smanish83/JobPilot/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+word = ["pywin32; sys_platform == 'win32'"]
+
+[project.scripts]
+jobpilot = "jobpilot:main"
+
+[tool.setuptools]
+py-modules = ["jobpilot"]

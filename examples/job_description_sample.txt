@@ -1,0 +1,18 @@
+Senior QA Automation Engineer - Example Corp (Remote, US)
+Salary: $120,000 - $140,000
+
+We are looking for a Senior QA Automation Engineer to build and maintain automated test
+frameworks for our web and API platform and embed them into CI/CD pipelines.
+
+Requirements
+- 5+ years of QA automation experience
+- Strong Playwright or Selenium experience with Python or TypeScript
+- REST API testing (Postman, RestAssured or similar)
+- CI/CD integration (GitHub Actions, Jenkins)
+- SQL for data validation
+- Agile/Scrum experience
+
+Nice to have
+- Performance testing (k6 or JMeter)
+- Docker and AWS
+- Accessibility testing (axe-core, WCAG)

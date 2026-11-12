@@ -1,0 +1,69 @@
+{
+  "how_to_use": [
+    "EXAMPLE ONLY: copy what you need into your own file with  jobpilot rules --edit",
+    "Each rule switches on when the job posting mentions ANY of its 'when_job_mentions' keywords.",
+    "'company' must match part of the employer name in your resume (e.g. 'Acme' matches 'Acme Health Inc.').",
+    "'replace_terms' swaps wording inside that company's bullets, e.g. Robot Framework -> Playwright.",
+    "'add_bullets' are achievements added to that company's section. Write ONLY work you actually did,",
+    "  with real tools, scale and results: interviewers will ask you about every line.",
+    "'add_skills' adds keywords to the Technical Skills section under the given category.",
+    "Bullets that still contain TODO are skipped until you replace them with your own text.",
+    "Check the file with:  jobpilot rules"
+  ],
+  "rules": [
+    {
+      "name": "Playwright",
+      "when_job_mentions": [
+        "Playwright"
+      ],
+      "changes": [
+        {
+          "company": "Your Most Recent Employer",
+          "replace_terms": {
+            "Robot Framework": "Playwright"
+          },
+          "add_bullets": [
+            "Built a Playwright and TypeScript framework covering 600+ UI and API tests, cutting regression time by 55%."
+          ]
+        }
+      ],
+      "add_skills": {
+        "Test Automation": [
+          "Playwright"
+        ]
+      }
+    },
+    {
+      "name": "Cloud (AWS / Docker)",
+      "when_job_mentions": [
+        "AWS",
+        "Amazon Web Services",
+        "Docker",
+        "Kubernetes",
+        "cloud",
+        "container",
+        "containers",
+        "EC2",
+        "S3",
+        "Lambda",
+        "ECS",
+        "EKS"
+      ],
+      "changes": [
+        {
+          "company": "Your Previous Employer",
+          "replace_terms": {},
+          "add_bullets": [
+            "Containerized test runners with Docker on AWS ECS, enabling parallel nightly regression runs."
+          ]
+        }
+      ],
+      "add_skills": {
+        "Cloud & DevOps": [
+          "AWS",
+          "Docker"
+        ]
+      }
+    }
+  ]
+}

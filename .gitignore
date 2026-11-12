@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Your personal files: never commit these
+applications/
+Job_Application_Tracker*.xlsx
+*.docx
+!examples/*.docx
+.resume_agent/
+.env

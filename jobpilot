@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ ! -x "$DIR/.venv/bin/python" ]; then
+  echo "JobPilot is not installed yet. Run ./setup_mac_linux.sh first."; exit 1
+fi
+exec "$DIR/.venv/bin/python" "$DIR/jobpilot.py" "$@"

@@ -1,0 +1,210 @@
+# JobPilot: How to Use
+
+This guide assumes setup is done (see SETUP.md). Run every command from a terminal opened **in the JobPilot folder**. In PowerShell type `.\jobpilot`, on Mac/Linux `./jobpilot`.
+
+---
+
+## 1. Your everyday workflow
+
+1. **Find a job** and copy its link.
+2. **Run** `jobpilot tailor "<job link>"`.
+3. **Read the three documents** in the new folder under `applications\`. Fix anything that isn't right.
+4. **Apply.** Upload the resume and cover letter. Use the suggested salary ask if the form asks for one.
+5. **Update the tracker** (`Job_Application_Tracker.xlsx`): set *Status* to `Applied` and fill in *Date Applied* and *Salary Requested*.
+
+## 2. Commands
+
+| Command | What it does |
+|---|---|
+| `jobpilot init` | Guided setup: API key, resume, work-authorization line |
+| `jobpilot check` | Checks everything is installed and set up |
+| `jobpilot setup --resume "My_Resume.docx"` | Saves (or replaces) your base resume |
+| `jobpilot tailor "<link>"` | Creates one application |
+| `jobpilot tailor "<link1>" "<link2>" "<link3>"` | Several applications, one after another |
+| `jobpilot tailor "<link1>" "<link2>" --parallel 3` | Several applications, up to 3 at the same time |
+| `jobpilot tailor --file jobs.txt --parallel 3` | Every link or file listed in `jobs.txt` |
+| `jobpilot tailor job_description.txt` | Uses a saved job description (.txt, .docx, .pdf) |
+| `jobpilot tailor --paste` | Paste a job description into the terminal |
+| `jobpilot tailor "<link>" --force` | Creates the application even if that job was already done |
+| `jobpilot tailor "<link>" --ignore-fit` | Creates the application even if the job is not a good fit for your experience |
+| `jobpilot rules` / `jobpilot rules --edit` | Shows / edits your experience rules |
+| `jobpilot settings` / `jobpilot settings --edit` | Shows / edits your settings |
+| `jobpilot render "applications\<folder>\content.json"` | Rebuilds the Word files after you edit `content.json` (no API cost) |
+| `jobpilot track` | Rebuilds or catches up the tracker from all application folders |
+| `jobpilot --version` | Shows the version |
+
+## 3. Your base resume
+
+`jobpilot setup` saves the text of your resume as your **base resume**:
+`C:\Users\<you>\.resume_agent\base_resume.txt` (Windows) or `~/.resume_agent/base_resume.txt` (Mac/Linux).
+
+- **Everything JobPilot writes comes from this file** (plus your experience rules). It is never allowed to invent experience.
+- **Make it complete.** Open it in Notepad or any text editor and add every project, tool, metric and achievement you can honestly claim, even ones your current resume leaves out. JobPilot picks what fits each job and keeps the result to two pages.
+- **Keep the structure:** the section names (`Professional Summary`, `Core Skills`, `Professional Experience`, `Education`), then each job as a "Company - Location" line, a "Title | Month YYYY - Month YYYY" line and one achievement per line.
+- **Careful:** running `jobpilot setup` again replaces this file with the text of the Word resume you give it. Edits you made only in `base_resume.txt` are lost unless you also put them in that Word file.
+- **Close the file in your editor when you're done.** An open editor window can later save an old copy over your changes.
+
+## 4. Tailoring
+
+### One job
+```
+jobpilot tailor "https://www.linkedin.com/jobs/view/1234567890/"
+```
+LinkedIn links usually work directly. Indeed and some company sites block automatic reading. JobPilot then asks you to **paste the description**: copy the full text from your browser, paste it, then press **Ctrl+Z then Enter** (Windows) or **Ctrl+D** (Mac/Linux).
+
+### Already applied? Duplicates are skipped
+Before creating anything, JobPilot checks each job link against your tracker and your `applications` folder. If you've already prepared or applied for that job, it shows you when, the status, and the folder, then skips it, with no API cost. Links are matched by the posting's ID, so the same job still matches when its link carries different tracking codes (for example LinkedIn's `?trackingId=...`). This works for LinkedIn, Indeed, Dice, Greenhouse, Lever, Ashby and most company career sites.
+
+- To create it again anyway, add `--force`.
+- The same job under a *different* link (for example on Dice instead of LinkedIn), as a pasted description, or from a file is caught right after the first step identifies the company and job title. JobPilot then stops before writing the resume and cover letter, so only one of the three model calls is used.
+- Same company and title but a *different location* counts as a separate opening and is created, with a note.
+
+### Not a fit? Skipped before writing anything
+Some postings share words with your experience but are a different job: a VP or Director role, "automation" that means ATM, kiosk, industrial/PLC or RPA work, a required clearance or license you don't have, or a mandatory core stack you've never used. Applying to them wastes your time.
+
+So the first step also scores how well the job matches your **real work experience** (0-100%). Self-directed learning doesn't count. Any hard blocker caps the score at 40%. If the score is below **70%** (setting `min_fit_score`), JobPilot stops right there: no resume or cover letter is written, and only one of the three model calls is used. It shows you why:
+
+```
+Not a fit, skipped: ATM Automation Engineer at Delta Bank
+  Role fit: 35% (ATM/banking hardware automation)
+  Blocker: Core work is ATM hardware and firmware validation, not software test automation
+  No resume or cover letter written (minimum fit is 70%). Use --ignore-fit to create it anyway.
+```
+
+- Skipped jobs are listed in `applications\skipped_not_a_fit.csv` (date, company, title, fit %, reason, link). Open it in Excel to review them.
+- If you run the same link again later, it is skipped at once, with no API cost. To check it again (for example, after adding experience to your base resume), delete its line from that file or use `--ignore-fit`.
+- The fit score of every job you *do* create is shown in the terminal and in the requirements document.
+- Too strict or too loose? Change `min_fit_score` (for example 60 or 80). Set it to 0 to turn the check off.
+
+### Several jobs
+```
+jobpilot tailor "<link 1>" "<link 2>" "<link 3>" --parallel 3
+```
+- On Windows Command Prompt, keep **all links on one line**. For long lists, use a file instead (below).
+- Without `--parallel`, the jobs run one after another. `--parallel N` runs up to N at a time (maximum 5). 2 or 3 is a good choice, because higher values can hit your API rate limit.
+- Postings are read first, one by one (you may be asked to paste a blocked one, or press Ctrl+Z / Ctrl+D right away to skip it). Then the applications are created. A failure never stops the other jobs. The summary at the end lists anything to re-run.
+
+### A list of jobs in a file
+Create `jobs.txt` with one link (or description file) per line; lines starting with `#` are ignored (see `examples\jobs.txt`). Then run:
+```
+jobpilot tailor --file jobs.txt --parallel 3
+```
+
+Each job takes about a minute and makes three model calls (one, if it turns out to be a duplicate or not a fit): one to analyze the job, one to tailor the resume, one to write the cover letter.
+
+## 5. What you get
+
+A folder for each job, named with the date and the job:
+`applications\2026-10-29_Acme_Corp_Senior_SDET\`
+
+| File | Contents |
+|---|---|
+| **Resume_...docx** | Tailored resume: headline with the posting's job title, summary, Core Skills, experience, Professional Development, Education |
+| **CoverLetter_...docx** | 250-350 words, written from the tailored resume, addressed to the hiring manager |
+| **JobRequirements_...docx** | Job details (location, remote/hybrid, pay, sponsorship), each requirement marked **Meets / Partial / Gap** with evidence from your resume, keywords found and missing, the ATS checklist, gaps to prepare for, likely interview topics, and the **full original posting** (useful if it is taken down before your interview) |
+| **content.json** | Everything that was generated. Edit it and run `jobpilot render` to rebuild the Word files without another API call. |
+
+Folder and file names drop bracketed tags such as `[Remote-US]` and special characters. Running the same job twice on the same day creates a `_2` folder instead of overwriting the first.
+
+## 6. ATS checks
+
+Most employers screen resumes with an Applicant Tracking System (ATS) before a person reads them. Every resume is checked for:
+
+- **Keyword coverage:** at least 80% of the posting's *required* keywords appear in your resume. Keywords you genuinely have but the draft left out are added automatically (only if they appear in your base resume or rules). Keywords you don't have are listed as gaps, never added.
+- **Job title:** the posting's title appears in your headline or summary.
+- **Layout:** contact details in the page body, standard section headings, a single column with no tables or graphics, a standard font, real bullets, consistent dates, no unusual symbols, a sensible length, and the .docx format.
+
+**Wording alignment.** Job postings describe the same experience in different words: "team player", "collaborates with onshore/offshore teams", "healthcare domain experience", "communicate testing status to stakeholders". JobPilot picks out these phrases from each posting. Wherever your base resume shows that experience in other words, the tailored resume uses the posting's exact phrase. It never uses a phrase you have no evidence for. The requirements document lists which phrases were matched and which weren't, so you can add real experience to your base resume if something is missing.
+
+The result (**PASS** or **NEEDS ATTENTION**) is shown in the terminal, in the requirements document and in the tracker.
+
+## 7. Two-page limit
+
+After building a resume, JobPilot counts its pages (exactly with Word on Windows, otherwise estimated). If it is too long:
+1. The oldest role (or the one named in your settings) is cut to its title line.
+2. If it is still too long and you list a higher degree (Master's, MBA, PhD), the Bachelor's degree is removed.
+
+If it is *still* too long, you are told, and you can shorten older bullets in `content.json` and run `render`. The page limit and both steps can be changed in settings.
+
+## 8. Experience rules
+
+Rules add experience **only when a posting asks for it**. For example: *"If the job mentions Playwright, describe my Robot Framework work at Acme as Playwright work and add my Playwright bullets."*
+
+Run `jobpilot rules --edit`. Each rule has:
+
+| Field | Meaning |
+|---|---|
+| `when_job_mentions` | The rule switches on if the posting mentions **any** of these words |
+| `changes[].company` | Part of the employer name as written in your resume (`Acme` matches `Acme Health Inc.`) |
+| `changes[].replace_terms` | Words to swap in that job's bullets, e.g. `{"Robot Framework": "Playwright"}` |
+| `changes[].add_bullets` | Achievements to add to that job. Bullets that still contain `TODO` are ignored. |
+| `add_skills` | Skills to add under a Core Skills category |
+
+See `examples\experience_rules.example.json` for a filled-in example. Run `jobpilot rules` to see which bullets are ready.
+
+**Only write experience you really have.** Interviewers will ask you about every line.
+
+## 9. Settings
+
+Run `jobpilot settings --edit` (the file is `.resume_agent\settings.json`):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `work_authorization` | `""` | A line shown under your contact details (example below). Empty means hidden. When set, the cover letter also says you need no sponsorship. |
+| `model` | `claude-sonnet-5-5` | The Anthropic model used |
+| `max_resume_pages` | `2` | Page limit for resumes |
+| `shorten_role_first` | `""` | Company whose bullets are cut first when too long (empty = your oldest role) |
+| `drop_bachelors_if_higher_degree` | `true` | Allow removing the Bachelor's degree when still too long |
+| `min_fit_score` | `70` | Skip jobs whose fit with your real experience is below this % (0 = never skip) |
+
+Example work-authorization line: `U.S. Work Authorized | No Visa Sponsorship Needed`
+
+The environment variables `JOBPILOT_WORK_AUTH` and `JOBPILOT_MODEL`, if set, take priority over this file.
+
+## 10. Salary guidance
+
+When a posting lists a maximum salary, JobPilot suggests what to ask for:
+
+| The posting lists | Suggested ask |
+|---|---|
+| A narrow range (max no more than 1.35 times the min) | About 85% of the way up the range |
+| A wide range | About 70% of the way up (the very top of a wide band is usually reserved) |
+| Only a maximum ("up to $X") | 97% of the maximum |
+| A single figure | That figure |
+| Hourly pay | The same rules, per hour |
+
+It also gives a **range to quote**, starting at the suggested ask. If a posting lists several ranges (by location, or a target and a full range), the first one is used and you are told to check which applies to you. These numbers come only from the posting. Compare them with market data for your city and role, and weigh bonus, equity and benefits, before you negotiate.
+
+## 11. The application tracker
+
+`Job_Application_Tracker.xlsx` is created next to your `applications` folder and updated after every run.
+
+- **Dark blue columns** are filled in by JobPilot: dates, company, job, location, pay, *Posted Max*, *Suggested Ask*, *Ask Range to Quote*, sponsorship, ATS result, keyword coverage, qualifications met, rules applied, and links to the posting, folder and resume.
+- **Yellow columns are yours:** *Status* (a drop-down), *Date Applied*, *Salary Requested*, *Follow-up Date*, *Contact*, *Next Step*, *Notes*. JobPilot never overwrites them.
+- **Follow-up Date** fills in as Date Applied + 7 days and turns **red** when it is due and the status is still *Applied* or *No Response*.
+- The **Summary** tab counts applications by status and shows your interview rate and average keyword coverage.
+- **Close the tracker before running JobPilot.** If it was open, the documents are still created; run `jobpilot track` afterwards to catch up.
+
+## 12. Editing and rebuilding
+
+Want to change a bullet, the summary or a cover-letter paragraph? Edit `content.json` in the job's folder (any text editor; keep the quotes and commas), then run:
+```
+jobpilot render "applications\2026-10-29_Acme_Corp_Senior_SDET\content.json"
+```
+This rebuilds the three Word files and refreshes the tracker, with no API call. You can also simply edit the Word files directly.
+
+## 13. Honesty and privacy
+
+- JobPilot is instructed never to invent employers, titles, dates, degrees, certifications, tools or metrics. **Still, read everything before sending.**
+- Your resume and the job posting are sent to the Anthropic API to generate the documents. Nothing else is sent anywhere.
+- Your personal files stay on your computer, in `.resume_agent` and your `applications` folder. Don't put your API key in shared files.
+
+## 14. FAQ
+
+**Can I use it for any profession?** Yes. Nothing is tied to one field; it works from your resume and the posting.
+
+**Can I change the look of the resume?** The layout is deliberately plain for ATS. You can restyle the Word file after it is created.
+
+**It says "Gap" for something I've done.** Add it to your base resume (or an experience rule) and run `tailor` again.
+
+**How much does it cost?** Each application makes three model calls. The exact cost depends on the model and the length of your resume and the posting; check your usage in the Anthropic Console.
