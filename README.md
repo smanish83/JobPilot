@@ -24,6 +24,7 @@ Every application is also added to **`Job_Application_Tracker.xlsx`**, where you
 - **Salary guidance.** When a posting lists a maximum, it suggests what to ask for and records it in the tracker.
 - **No duplicates.** Jobs you've already prepared or applied for are recognized by their link and skipped.
 - **Skips jobs that aren't a fit.** Before writing anything, it scores how well the job matches your real experience. A VP role, "automation" that means ATM or factory equipment, or a must-have stack you've never used scores below 70%, so it is skipped with the reason, and you save the time and API cost.
+- **Configurable.** One configuration file decides whether you get a cover letter, Word or PDF (or both) for each document, the page limit, which jobs to skip (titles such as VP, on-site jobs, pay below your minimum, words like "security clearance") and, optionally, your API key.
 - **Several jobs at once.** Pass several links, or a file of links, and run them one after another or in parallel.
 
 ## Quick start
@@ -60,12 +61,12 @@ JobPilot/
 ├── requirements-dev.txt      extra library for running the tests (pytest)
 ├── tests/                    automated tests (no API key or internet needed)
 ├── pyproject.toml            for installing with pip instead (optional)
-├── examples/                 a sample resume, a sample job, a jobs list and a sample experience-rules file
+├── examples/                 a sample resume, a sample job, a jobs list, sample experience rules and a sample configuration
 ├── CHANGELOG.md              what changed in each version
 └── LICENSE                   MIT License
 ```
 
-Your personal data never goes in this folder's code. Your base resume, settings and experience rules live in a `.resume_agent` folder in your home directory, and your applications are created in the folder you run JobPilot from. That means you can share or update this folder without sharing your resume. The included `.gitignore` also keeps `applications/`, trackers and Word files out of Git, so a fork or clone never publishes them by accident.
+Your personal data never goes in this folder's code. Your base resume, configuration file and experience rules live in a `.resume_agent` folder in your home directory, and your applications are created in the folder you run JobPilot from. That means you can share or update this folder without sharing your resume. The included `.gitignore` also keeps `applications/`, trackers and Word files out of Git, so a fork or clone never publishes them by accident.
 
 ## Important
 

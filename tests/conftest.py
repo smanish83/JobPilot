@@ -102,7 +102,6 @@ def jp(tmp_path, monkeypatch):
     monkeypatch.setattr(jobpilot, "RULES_FILE", home / "experience_rules.json")
     monkeypatch.setattr(jobpilot, "LAST_REPLY", home / "last_model_reply.txt")
     monkeypatch.setattr(jobpilot, "SETTINGS", copy.deepcopy(jobpilot.DEFAULT_SETTINGS))
-    monkeypatch.setattr(jobpilot, "WORK_AUTH", "")
     # Page counting through Word or LibreOffice is slow and machine-specific: use the estimate.
     monkeypatch.setattr(jobpilot, "_pages_with_word", lambda path: None)
     monkeypatch.setattr(jobpilot, "_pages_with_libreoffice", lambda path: None)

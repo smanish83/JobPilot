@@ -1,0 +1,24 @@
+{
+  "anthropic_api_key": "",
+  "model": "claude-sonnet-5-5",
+  "work_authorization": "U.S. Work Authorized | No Visa Sponsorship Needed",
+  "documents": {
+    "cover_letter": true,
+    "requirements_document": true,
+    "resume_format": "both",
+    "cover_letter_format": "pdf",
+    "requirements_format": "docx"
+  },
+  "resume": {
+    "max_pages": 2,
+    "shorten_role_first": "",
+    "drop_bachelors_if_higher_degree": true
+  },
+  "conditions": {
+    "min_fit_score": 70,
+    "skip_if_posting_mentions": ["security clearance", "TS/SCI"],
+    "skip_job_titles_with": ["VP", "Vice President", "Director", "Intern"],
+    "allowed_work_arrangements": ["Remote", "Hybrid"],
+    "min_salary": 110000
+  }
+}

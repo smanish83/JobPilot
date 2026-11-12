@@ -27,9 +27,9 @@ This guide assumes setup is done (see SETUP.md). Run every command from a termin
 | `jobpilot tailor job_description.txt` | Uses a saved job description (.txt, .docx, .pdf) |
 | `jobpilot tailor --paste` | Paste a job description into the terminal |
 | `jobpilot tailor "<link>" --force` | Creates the application even if that job was already done |
-| `jobpilot tailor "<link>" --ignore-fit` | Creates the application even if the job is not a good fit for your experience |
+| `jobpilot tailor "<link>" --ignore-fit` | Creates the application even if the job fails the fit check or your conditions |
 | `jobpilot rules` / `jobpilot rules --edit` | Shows / edits your experience rules |
-| `jobpilot settings` / `jobpilot settings --edit` | Shows / edits your settings |
+| `jobpilot settings` / `jobpilot settings --edit` | Shows / edits your configuration file (documents, formats, page limit, conditions, API key) |
 | `jobpilot render "applications\<folder>\content.json"` | Rebuilds the Word files after you edit `content.json` (no API cost) |
 | `jobpilot track` | Rebuilds or catches up the tracker from all application folders |
 | `jobpilot --version` | Shows the version |
@@ -76,7 +76,8 @@ Not a fit, skipped: ATM Automation Engineer at Delta Bank
 - Skipped jobs are listed in `applications\skipped_not_a_fit.csv` (date, company, title, fit %, reason, link). Open it in Excel to review them.
 - If you run the same link again later, it is skipped at once, with no API cost. To check it again (for example, after adding experience to your base resume), delete its line from that file or use `--ignore-fit`.
 - The fit score of every job you *do* create is shown in the terminal and in the requirements document.
-- Too strict or too loose? Change `min_fit_score` (for example 60 or 80). Set it to 0 to turn the check off.
+- Too strict or too loose? Change `min_fit_score` in the `conditions` section of the configuration file (for example 60 or 80). Set it to 0 to turn the check off.
+- You can add your own rules too, such as skipping VP or Director titles, on-site jobs, or pay below your minimum. See section 9.
 
 ### Several jobs
 ```
@@ -126,7 +127,7 @@ After building a resume, JobPilot counts its pages (exactly with Word on Windows
 1. The oldest role (or the one named in your settings) is cut to its title line.
 2. If it is still too long and you list a higher degree (Master's, MBA, PhD), the Bachelor's degree is removed.
 
-If it is *still* too long, you are told, and you can shorten older bullets in `content.json` and run `render`. The page limit and both steps can be changed in settings.
+If it is *still* too long, you are told, and you can shorten older bullets in `content.json` and run `render`. The page limit and both steps can be changed in the configuration file (`resume` section).
 
 ## 8. Experience rules
 
@@ -146,20 +147,65 @@ See `examples\experience_rules.example.json` for a filled-in example. Run `jobpi
 
 **Only write experience you really have.** Interviewers will ask you about every line.
 
-## 9. Settings
+## 9. Configuration file
 
-Run `jobpilot settings --edit` (the file is `.resume_agent\settings.json`):
+Everything you can change lives in one file: `.resume_agent\settings.json` in your home folder. Open it with `jobpilot settings --edit`, or see the current values with `jobpilot settings`. It is plain JSON: keep the quotes, commas and brackets. `jobpilot check` tells you if something is wrong. A filled-in example is `examples\settings.example.json`.
+
+```json
+{
+  "anthropic_api_key": "",
+  "model": "claude-sonnet-5-5",
+  "work_authorization": "U.S. Work Authorized | No Visa Sponsorship Needed",
+  "documents": { "cover_letter": true, "requirements_document": true,
+                 "resume_format": "both", "cover_letter_format": "pdf", "requirements_format": "docx" },
+  "resume": { "max_pages": 2, "shorten_role_first": "", "drop_bachelors_if_higher_degree": true },
+  "conditions": { "min_fit_score": 70, "skip_if_posting_mentions": ["security clearance"],
+                  "skip_job_titles_with": ["VP", "Director"], "allowed_work_arrangements": ["Remote", "Hybrid"],
+                  "min_salary": 110000 }
+}
+```
+
+**General**
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `work_authorization` | `""` | A line shown under your contact details (example below). Empty means hidden. When set, the cover letter also says you need no sponsorship. |
+| `anthropic_api_key` | `""` | Your API key. Used only when the `ANTHROPIC_API_KEY` environment variable is not set. The file is plain text, so keep it private and never share or commit it. |
 | `model` | `claude-sonnet-5-5` | The Anthropic model used |
-| `max_resume_pages` | `2` | Page limit for resumes |
+| `work_authorization` | `""` | A line under your contact details, e.g. `U.S. Work Authorized \| No Visa Sponsorship Needed`. Empty means hidden. When set, the cover letter also says you need no sponsorship. |
+
+**documents**: what is created, and in which format
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `cover_letter` | `true` | `false` = no cover letter. This also saves one of the three model calls. |
+| `requirements_document` | `true` | `false` = no JobRequirements document |
+| `resume_format` | `docx` | `docx`, `pdf` or `both` |
+| `cover_letter_format` | `docx` | `docx`, `pdf` or `both` |
+| `requirements_format` | `docx` | `docx`, `pdf` or `both` |
+
+PDFs are made with Microsoft Word (Windows, through pywin32, which the setup installs) or LibreOffice (free, any system). If neither is available, the Word file is kept and you are told. For online applications, **.docx is the safest format for ATS**; `both` gives you a PDF to email as well.
+
+**resume**: length
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `max_pages` | `2` | Page limit (see section 7) |
 | `shorten_role_first` | `""` | Company whose bullets are cut first when too long (empty = your oldest role) |
 | `drop_bachelors_if_higher_degree` | `true` | Allow removing the Bachelor's degree when still too long |
-| `min_fit_score` | `70` | Skip jobs whose fit with your real experience is below this % (0 = never skip) |
 
-Example work-authorization line: `U.S. Work Authorized | No Visa Sponsorship Needed`
+**conditions**: which jobs are worth a resume
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `min_fit_score` | `70` | Skip jobs whose fit with your real experience is below this % (0 = never skip). See section 4. |
+| `skip_if_posting_mentions` | `[]` | Skip a posting that mentions any of these words, e.g. `["security clearance", "TS/SCI"]`. Checked **before** any model call, so it costs nothing. |
+| `skip_job_titles_with` | `[]` | Skip job titles containing any of these whole words, e.g. `["VP", "Director", "Intern"]` |
+| `allowed_work_arrangements` | `[]` | Only these, e.g. `["Remote", "Hybrid"]`. Empty = any. Postings that don't say are kept. |
+| `min_salary` | `0` | Skip jobs whose posted maximum is below this yearly amount (hourly pay is converted at 2,080 hours). Postings without pay are kept. 0 = off. |
+
+Jobs skipped by a condition are listed in `applications\skipped_not_a_fit.csv` with the reason, like jobs that aren't a fit. `--ignore-fit` overrides the fit check and all conditions for one run.
+
+**Older settings files** (version 2.3 and earlier) are upgraded automatically the next time you run `jobpilot settings`: your values are kept, the new options are added, and the old file is saved as `settings.json.bak`.
 
 The environment variables `JOBPILOT_WORK_AUTH` and `JOBPILOT_MODEL`, if set, take priority over this file.
 

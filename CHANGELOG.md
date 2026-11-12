@@ -2,6 +2,12 @@
 
 ## 2.4.0 (unreleased)
 
+- **Configuration file.** `settings.json` now has sections you can edit with `jobpilot settings --edit`:
+  - `documents`: cover letter on or off (off also saves a model call), the JobRequirements document on or off, and `docx`, `pdf` or `both` for each document. PDFs are made with Microsoft Word or LibreOffice.
+  - `resume`: page limit and how to shorten.
+  - `conditions`: minimum fit score, words that rule a posting out before any model call, job-title words to skip (e.g. VP, Director), allowed work arrangements and a minimum salary.
+  - `anthropic_api_key`: optional, used when the environment variable is not set.
+  - Older flat settings files are upgraded automatically, keeping your values (backup: `settings.json.bak`). `jobpilot check` reports configuration mistakes.
 - **Automated tests.** A pytest suite (`tests/`) runs JobPilot end to end with a fake model and the sample resume: no API key or internet needed. GitHub Actions runs it on Windows and Linux with Python 3.10 and 3.13.
 - **Sample resume.** `examples/sample_resume.docx` and `.txt`: a complete resume for a fictional QA engineer that shows the expected structure. `jobpilot setup --sample` (or typing `sample` in `jobpilot init`) loads it so you can try JobPilot end to end.
 

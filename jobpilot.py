@@ -69,22 +69,71 @@ __version__ = "2.3.0"
 HOME = Path.home() / ".resume_agent"
 SETTINGS_FILE = HOME / "settings.json"
 DEFAULT_SETTINGS = {
+    "anthropic_api_key": "",             # optional: your API key, used when ANTHROPIC_API_KEY is not set
+    "model": "claude-sonnet-5-5",        # Anthropic model used for every step
     "work_authorization": "",            # e.g. "U.S. Work Authorized | No Visa Sponsorship Needed" ("" = hidden)
-    "model": "claude-sonnet-5-5",        # Anthropic model used for all three steps
-    "max_resume_pages": 2,               # longer resumes are trimmed automatically
-    "shorten_role_first": "",            # company whose bullets go first when too long ("" = your oldest role)
-    "drop_bachelors_if_higher_degree": True,  # when still too long and a Master's/PhD/MBA is listed
-    "min_fit_score": 70,                 # skip jobs that match your real experience less than this (%); 0 = off
+    "documents": {
+        "cover_letter": True,            # false = no cover letter (also saves one model call)
+        "requirements_document": True,   # the JobRequirements breakdown
+        "resume_format": "docx",         # docx, pdf or both
+        "cover_letter_format": "docx",
+        "requirements_format": "docx",
+    },
+    "resume": {
+        "max_pages": 2,                  # longer resumes are trimmed automatically
+        "shorten_role_first": "",        # company whose bullets go first when too long ("" = your oldest role)
+        "drop_bachelors_if_higher_degree": True,  # when still too long and a Master's/PhD/MBA is listed
+    },
+    "conditions": {
+        "min_fit_score": 70,             # skip jobs that match your real experience less than this (%); 0 = off
+        "skip_if_posting_mentions": [],  # e.g. ["security clearance"]: skipped before any model call
+        "skip_job_titles_with": [],      # e.g. ["VP", "Director", "Intern"]
+        "allowed_work_arrangements": [], # e.g. ["Remote", "Hybrid"]; empty = any
+        "min_salary": 0,                 # yearly; skip when the posted maximum is lower (0 = off)
+    },
 }
+# Settings files from version 2.3 and earlier were flat; these keys moved into sections.
+_OLD_KEYS = {"max_resume_pages": ("resume", "max_pages"),
+             "shorten_role_first": ("resume", "shorten_role_first"),
+             "drop_bachelors_if_higher_degree": ("resume", "drop_bachelors_if_higher_degree"),
+             "min_fit_score": ("conditions", "min_fit_score")}
+DOC_FORMATS = ("docx", "pdf", "both")
+
+
+def _merge(defaults: dict, values: dict) -> dict:
+    """defaults updated with values, section by section (unknown keys are kept)."""
+    merged = {}
+    for key, default in defaults.items():
+        value = values.get(key, default)
+        merged[key] = _merge(default, value) if isinstance(default, dict) and isinstance(value, dict) else value
+    merged.update({k: v for k, v in values.items() if k not in defaults})
+    return merged
+
+
+def upgrade_settings(raw: dict) -> dict:
+    """Move old flat keys (version 2.3 and earlier) into their sections."""
+    raw = dict(raw)
+    for old, (section, key) in _OLD_KEYS.items():
+        if old in raw:
+            value = raw.pop(old)
+            raw[section] = dict(raw.get(section) or {})
+            raw[section].setdefault(key, value)
+    return raw
+
+
+def read_settings_file() -> dict:
+    if not SETTINGS_FILE.exists():
+        return {}
+    try:
+        raw = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as err:
+        sys.exit(f"Your configuration file has a JSON error (line {err.lineno}, column {err.colno}):\n"
+                 f"  {SETTINGS_FILE}\nFix it (often a missing comma or quote), then run the command again.")
+    return raw if isinstance(raw, dict) else {}
 
 
 def load_settings() -> dict:
-    settings = dict(DEFAULT_SETTINGS)
-    if SETTINGS_FILE.exists():
-        try:
-            settings.update(json.loads(SETTINGS_FILE.read_text(encoding="utf-8")))
-        except json.JSONDecodeError as err:
-            sys.exit(f"Your settings file has a JSON error (line {err.lineno}): {SETTINGS_FILE}")
+    settings = _merge(DEFAULT_SETTINGS, upgrade_settings(read_settings_file()))
     # environment variables still work and take priority
     for prefix in ("JOBAPPLY_", "JOBPILOT_"):  # JOBAPPLY_* is the old name, still honored
         if prefix + "WORK_AUTH" in os.environ:
@@ -94,8 +143,53 @@ def load_settings() -> dict:
     return settings
 
 
+def cfg(path: str, default=None):
+    """A setting by its dotted path, e.g. cfg("documents.cover_letter")."""
+    value = SETTINGS
+    for part in path.split("."):
+        if not isinstance(value, dict) or part not in value:
+            return default
+        value = value[part]
+    return value
+
+
+def doc_format(kind: str) -> str:
+    """docx, pdf or both for 'resume', 'cover_letter' or 'requirements'."""
+    value = str(cfg(f"documents.{kind}_format") or "docx").strip().lower()
+    return value if value in DOC_FORMATS else "docx"
+
+
+def work_auth() -> str:
+    """Highlighted under your contact details on the resume and cover letter."""
+    return str(cfg("work_authorization") or "").strip()
+
+
+def max_pages() -> int:
+    try:
+        return max(1, int(cfg("resume.max_pages") or 2))
+    except (TypeError, ValueError):
+        return 2
+
+
+def settings_problems() -> list[str]:
+    problems = []
+    for kind in ("resume", "cover_letter", "requirements"):
+        value = str(cfg(f"documents.{kind}_format") or "docx").strip().lower()
+        if value not in DOC_FORMATS:
+            problems.append(f'documents.{kind}_format is "{value}": use "docx", "pdf" or "both" (using docx).')
+    for path in ("conditions.min_fit_score", "conditions.min_salary", "resume.max_pages"):
+        try:
+            float(cfg(path) or 0)
+        except (TypeError, ValueError):
+            problems.append(f"{path} must be a number.")
+    for path in ("conditions.skip_if_posting_mentions", "conditions.skip_job_titles_with",
+                 "conditions.allowed_work_arrangements"):
+        if not isinstance(cfg(path, []), list):
+            problems.append(f'{path} must be a list, e.g. ["VP", "Director"].')
+    return problems
+
+
 SETTINGS = load_settings()
-MODEL = SETTINGS["model"]
 _PRINT_LOCK = threading.Lock()
 _TASK = threading.local()  # per-thread label such as "[2/3 Acme]" for parallel runs
 
@@ -105,8 +199,6 @@ def log(message: str = ""):
     label = getattr(_TASK, "label", "")
     with _PRINT_LOCK:
         print(f"{label} {message}" if label and message else message, flush=True)
-# Highlighted under your contact details on the resume and cover letter (settings: work_authorization).
-WORK_AUTH = str(SETTINGS.get("work_authorization") or "").strip()
 BASE_TEXT = HOME / "base_resume.txt"
 OUTPUT_DIR = Path("applications")
 
@@ -322,11 +414,50 @@ class AlreadyDone(Exception):
 
 
 class NotAFit(Exception):
-    """The posting matches the candidate's real experience too little to be worth applying."""
-    def __init__(self, analysis: dict, score: int):
+    """The posting matches the candidate's real experience too little, or breaks one of the conditions in the
+    configuration (job title, work arrangement, salary), so it is not worth applying."""
+    def __init__(self, analysis: dict, score: int | None, reasons: list[str] | None = None):
         fit = analysis.get("fit") or {}
-        super().__init__(f"fit {score}%: {fit.get('reason', '')}")
-        self.analysis, self.score = analysis, score
+        self.analysis, self.score, self.reasons = analysis, score, list(reasons or [])
+        super().__init__("; ".join(self.reasons) if self.reasons else f"fit {score}%: {fit.get('reason', '')}")
+
+
+def _yearly(value, period) -> float | None:
+    number = _to_number(value)
+    if number is None:
+        return None
+    return number * 2080 if (period == "hour" or number < 500) else number
+
+
+def condition_failures(analysis: dict) -> list[str]:
+    """The conditions from the configuration this job breaks (empty list = none)."""
+    req = analysis.get("job_requirements") or {}
+    reasons = []
+    title = str(analysis.get("job_title") or "")
+    for word in cfg("conditions.skip_job_titles_with", []) or []:
+        if str(word).strip() and keyword_in(str(word), title):
+            reasons.append(f'job title contains "{word}"')
+            break
+    allowed = [str(a).strip() for a in cfg("conditions.allowed_work_arrangements", []) or [] if str(a).strip()]
+    arrangement = str(req.get("work_arrangement") or "")
+    if allowed and arrangement and "not listed" not in arrangement.lower() \
+            and not any(keyword_in(a, arrangement) or a.lower() in arrangement.lower() for a in allowed):
+        reasons.append(f"work arrangement is {arrangement} (you allow: {', '.join(allowed)})")
+    minimum = _to_number(cfg("conditions.min_salary", 0))
+    if minimum:
+        top = _yearly(req.get("salary_max"), req.get("salary_period"))
+        if top is None:
+            parsed = parse_salary(req.get("compensation", ""))
+            top = _yearly(parsed["max"], parsed["period"]) if parsed else None
+        if top is not None and top < minimum:
+            reasons.append(f"posted pay tops out at {money(top)} a year, below your minimum of {money(minimum)}")
+    return reasons
+
+
+def posting_mentions_blocked(job_text: str) -> list[str]:
+    """Words from conditions.skip_if_posting_mentions found in the posting (checked before any model call)."""
+    return [str(w) for w in cfg("conditions.skip_if_posting_mentions", []) or []
+            if str(w).strip() and keyword_in(str(w), job_text)]
 
 
 def fit_score(analysis: dict) -> int | None:
@@ -375,9 +506,13 @@ def log_not_a_fit(err: "NotAFit", source: str):
             if new:
                 w.writerow(SKIP_LOG_FIELDS)
             a, fit = err.analysis, err.analysis.get("fit") or {}
-            reason = "; ".join([str(b) for b in fit.get("blockers") or [] if str(b).strip()] + [fit.get("reason", "")])
+            if err.reasons:
+                reason = "Your conditions: " + "; ".join(err.reasons)
+            else:
+                reason = "; ".join([str(b) for b in fit.get("blockers") or [] if str(b).strip()] + [fit.get("reason", "")])
             w.writerow([date.today().isoformat(), a.get("company", ""), a.get("job_title", ""),
-                        a.get("job_location", ""), err.score, fit.get("role_family", ""), reason.strip("; "), source])
+                        a.get("job_location", ""), "" if err.score is None else err.score,
+                        fit.get("role_family", ""), reason.strip("; "), source])
     except OSError as e:  # e.g. open in Excel
         print(f"  Note: could not record it in {path} ({e}).")
 
@@ -606,7 +741,7 @@ def _ask_json(client, system: str, prompt: str, check, label: str, max_tokens: i
     messages = [{"role": "user", "content": prompt}]
     problem = "no reply"
     for attempt in range(2):
-        with client.messages.stream(model=MODEL, max_tokens=max_tokens, system=system,
+        with client.messages.stream(model=cfg("model"), max_tokens=max_tokens, system=system,
                                     messages=messages) as stream:
             response = stream.get_final_message()
         text = "".join(b.text for b in response.content if b.type == "text")
@@ -668,13 +803,14 @@ def generate(base_resume: str, job_text: str, rules_text: str = "", after_analys
     shared = (f"<base_resume>\n{base_resume}\n</base_resume>\n\n{rules_text}"
               f"<job_posting>\n{job_text}\n</job_posting>\n\n")
 
-    log("  1/3 Analyzing the job posting...")
+    steps = 3 if cfg("documents.cover_letter", True) else 2
+    log(f"  1/{steps} Analyzing the job posting...")
     analysis = _ask_json(client, ANALYZE_PROMPT, shared + "Analyze this job against the resume.",
                          _check_analysis, "job analysis")
     if after_analysis:
         after_analysis(analysis)  # may raise AlreadyDone: stops before the resume and cover letter
 
-    log("  2/3 Tailoring the resume...")
+    log(f"  2/{steps} Tailoring the resume...")
     keywords = ", ".join(analysis["job_requirements"].get("tech_stack", []))
     phrases = " | ".join(analysis["job_requirements"].get("ats_phrases", []))
     resume = _ask_json(client, RESUME_PROMPT,
@@ -685,10 +821,12 @@ def generate(base_resume: str, job_text: str, rules_text: str = "", after_analys
                        "<posting_phrases> wherever the base resume shows that experience.",
                        _check_resume, "tailored resume", max_tokens=16000)
 
+    if steps == 2:  # cover letter turned off in the configuration
+        return {**analysis, **resume}
     log("  3/3 Writing the cover letter...")
     auth = ""
-    if WORK_AUTH:
-        auth = (f"<work_authorization>{WORK_AUTH}</work_authorization>\nIn the final paragraph, state this "
+    if work_auth():
+        auth = (f"<work_authorization>{work_auth()}</work_authorization>\nIn the final paragraph, state this "
                 "in one short, confident sentence (e.g. 'I do not require visa sponsorship.').\n\n")
     letter = _ask_json(client, COVER_LETTER_PROMPT,
                        f"<tailored_resume>\n{json.dumps(resume, indent=1)}\n</tailored_resume>\n\n{auth}"
@@ -761,15 +899,15 @@ def add_name_header(doc, name: str, contact: str, headline: str = ""):
         run.bold, run.font.size = True, Pt(11.5)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.space_after = Pt(0 if WORK_AUTH else 4)
+    p.paragraph_format.space_after = Pt(0 if work_auth() else 4)
     run = p.add_run(contact)
     run.font.size, run.font.color.rgb = Pt(9.5), GRAY
-    if WORK_AUTH:
+    if work_auth():
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p.paragraph_format.space_before = Pt(2)
         p.paragraph_format.space_after = Pt(4)
-        run = p.add_run(WORK_AUTH)
+        run = p.add_run(work_auth())
         run.bold, run.font.size, run.font.color.rgb = True, Pt(10), ACCENT
 
 
@@ -876,7 +1014,7 @@ def build_cover_letter(data: dict, path: Path):
     para(f"Re: {data['job_title']}", bold=True)
     para(letter["greeting"])
     paragraphs = list(letter["paragraphs"])
-    if WORK_AUTH and paragraphs and not any("sponsor" in b.lower() for b in paragraphs):
+    if work_auth() and paragraphs and not any("sponsor" in b.lower() for b in paragraphs):
         # The model forgot: add the statement to the closing paragraph.
         paragraphs[-1] = paragraphs[-1].rstrip() + " I do not require visa sponsorship."
     for body in paragraphs:
@@ -1103,7 +1241,6 @@ def new_folder_for(data: dict) -> Path:
 # ---------------------------------------------------------------------------
 # Two-page limit for the resume
 # ---------------------------------------------------------------------------
-MAX_RESUME_PAGES = int(SETTINGS.get("max_resume_pages") or 2)
 HIGHER_DEGREE = re.compile(r"\b(master|m\.?s\.?|mba|ph\.?d|doctor)", re.I)
 
 
@@ -1161,7 +1298,7 @@ def estimate_resume_pages(data: dict) -> float:
     height = 20 * 1.22 + 2                       # name
     if data.get("headline"):
         height += 11.5 * 1.22 + 1
-    height += 9.5 * 1.22 + 4 + (10 * 1.22 + 6 if WORK_AUTH else 0)
+    height += 9.5 * 1.22 + 4 + (10 * 1.22 + 6 if work_auth() else 0)
     heading = 12 * 1.22 + 11 + 2                 # section heading with spacing and rule
     sections = 3 + sum(1 for k in ("professional_development", "education", "certifications") if data.get(k))
     height += sections * heading
@@ -1190,7 +1327,7 @@ def count_resume_pages(path: Path, data: dict) -> tuple[float, str]:
 
 def _over_limit(pages: float, how: str) -> bool:
     # The estimate runs slightly low near the limit (checked against 124 real resumes), so it uses a margin.
-    return pages > MAX_RESUME_PAGES if how != "estimate" else pages > MAX_RESUME_PAGES - 0.07
+    return pages > max_pages() if how != "estimate" else pages > max_pages() - 0.07
 
 
 def fit_resume_to_two_pages(data: dict, path: Path) -> list[str]:
@@ -1199,7 +1336,7 @@ def fit_resume_to_two_pages(data: dict, path: Path) -> list[str]:
     trims = []
     pages, how = count_resume_pages(path, data)
     steps = []
-    target = str(SETTINGS.get("shorten_role_first") or "").lower()
+    target = str(cfg("resume.shorten_role_first") or "").lower()
     old_jobs = [j for j in data.get("experience", []) if target and target in j.get("company", "").lower()]
     old_jobs = old_jobs or data.get("experience", [])[-1:]
     for job in old_jobs:
@@ -1208,7 +1345,7 @@ def fit_resume_to_two_pages(data: dict, path: Path) -> list[str]:
                           lambda j=job: j.update(bullets=[], description="")))
     education = data.get("education", [])
     has_higher = any(HIGHER_DEGREE.search(e) for e in education if not re.match(r"\s*bachelor", e, re.I))
-    if SETTINGS.get("drop_bachelors_if_higher_degree", True) and has_higher and \
+    if cfg("resume.drop_bachelors_if_higher_degree", True) and has_higher and \
             any(re.match(r"\s*bachelor", e, re.I) for e in education):
         steps.append(("removed the Bachelor's degree",
                       lambda: data.update(education=[e for e in data["education"]
@@ -1222,11 +1359,86 @@ def fit_resume_to_two_pages(data: dict, path: Path) -> list[str]:
         pages, how = count_resume_pages(path, data)
     shown = f"{pages:.0f}" if how != "estimate" else f"about {pages:.1f}"
     if trims:
-        print(f"Resume was over {MAX_RESUME_PAGES} pages: {'; '.join(trims)}. Now {shown} pages ({how}).")
+        print(f"Resume was over {max_pages()} pages: {'; '.join(trims)}. Now {shown} pages ({how}).")
     if _over_limit(pages, how):
         print(f"Note: the resume is still {shown} pages ({how}). Consider shortening older bullets "
               "in content.json, then run render.")
     return trims
+
+
+def _libreoffice_exe() -> str | None:
+    found = shutil.which("soffice") or shutil.which("libreoffice")
+    if found or not sys.platform.startswith("win"):
+        return found
+    for base in (os.environ.get("ProgramFiles", r"C:\Program Files"),
+                 os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")):
+        exe = Path(base) / "LibreOffice" / "program" / "soffice.exe"
+        if exe.exists():
+            return str(exe)
+    return None
+
+
+def _pdf_with_word(path: Path) -> Path | None:
+    if not sys.platform.startswith("win"):
+        return None
+    try:
+        import win32com.client  # type: ignore
+    except ImportError:
+        return None
+    word = doc = None
+    pdf = path.with_suffix(".pdf")
+    try:
+        word = win32com.client.DispatchEx("Word.Application")
+        word.Visible = False
+        word.DisplayAlerts = 0
+        doc = word.Documents.Open(str(path.resolve()), ReadOnly=True, AddToRecentFiles=False)
+        doc.SaveAs2(str(pdf.resolve()), FileFormat=17)  # 17 = wdFormatPDF
+        return pdf if pdf.exists() else None
+    except Exception:
+        return None
+    finally:
+        try:
+            if doc is not None:
+                doc.Close(False)
+            if word is not None:
+                word.Quit()
+        except Exception:
+            pass
+
+
+def _pdf_with_libreoffice(path: Path) -> Path | None:
+    import subprocess
+    exe = _libreoffice_exe()
+    if not exe:
+        return None
+    try:
+        subprocess.run([exe, "--headless", "--convert-to", "pdf", "--outdir", str(path.parent), str(path)],
+                       capture_output=True, timeout=180, check=True)
+    except Exception:
+        return None
+    pdf = path.with_suffix(".pdf")
+    return pdf if pdf.exists() else None
+
+
+def convert_to_pdf(path: Path) -> Path | None:
+    """PDF copy of a Word file, made with Microsoft Word (Windows) or LibreOffice. None if neither works."""
+    return _pdf_with_word(path) or _pdf_with_libreoffice(path)
+
+
+def export_formats(folder: Path, job_name: str):
+    """Make PDF copies (or PDF only) of the documents as the configuration asks."""
+    for kind, prefix in (("resume", "Resume"), ("cover_letter", "CoverLetter"), ("requirements", "JobRequirements")):
+        fmt = doc_format(kind)
+        docx = folder / f"{prefix}_{job_name}.docx"
+        if fmt == "docx" or not docx.exists():
+            continue
+        pdf = convert_to_pdf(docx)
+        if pdf is None:
+            log(f"Note: could not make a PDF of {docx.name} (needs Microsoft Word with pywin32, or LibreOffice). "
+                "Kept the Word file.")
+            continue
+        if fmt == "pdf":
+            docx.unlink()
 
 
 def write_application(data: dict, folder: Path | None = None) -> Path:
@@ -1248,8 +1460,11 @@ def write_application(data: dict, folder: Path | None = None) -> Path:
             data["resume_trims"] = sorted(set(data.get("resume_trims", []) + trims))
             data["ats"] = ats_check(data)  # re-score the trimmed resume
             content_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        build_cover_letter(data, folder / f"CoverLetter_{job_name}.docx")
-        build_requirements(data, folder / f"JobRequirements_{job_name}.docx")
+        if cfg("documents.cover_letter", True) and data.get("cover_letter", {}).get("paragraphs"):
+            build_cover_letter(data, folder / f"CoverLetter_{job_name}.docx")
+        if cfg("documents.requirements_document", True):
+            build_requirements(data, folder / f"JobRequirements_{job_name}.docx")
+        export_formats(folder, job_name)
     except Exception:
         print(f"\nBuilding the Word files failed. The generated content is saved in:\n  {content_path}\n"
               f'After fixing the problem, rebuild without a new API call:\n  jobpilot render "{content_path}"\n')
@@ -1516,7 +1731,8 @@ def _tracker_values(data: dict, folder: Path) -> dict:
     ats = data.get("ats") or {}
     sal = data.get("salary") if "salary" in data else salary_suggestion(data)
     job_name = f"{slug(data['company'])}_{slug(data['job_title'])}"
-    resume = next(iter(sorted(folder.glob("Resume_*.docx"))), folder / f"Resume_{job_name}.docx")
+    resume = next(iter(sorted(folder.glob("Resume_*.docx")) + sorted(folder.glob("Resume_*.pdf"))),
+                  folder / f"Resume_{job_name}.docx")
     return {
         "Applied Date": applied_date(data),
         "Company": data.get("company", ""), "Job Title": data.get("job_title", ""),
@@ -1896,7 +2112,9 @@ def ats_check(data: dict) -> dict:
         ("No unusual symbols or emoji", not odd_chars,
          "Plain text" if not odd_chars else "Found: " + " ".join(odd_chars)),
         ("Length about 1-2 pages (450-1200 words)", 450 <= words <= 1200, f"{words} words"),
-        ("Saved as .docx (most widely accepted by ATS)", True, "Word document"),
+        ("ATS-friendly file format", True,
+         "Word .docx (most widely accepted by ATS)" if doc_format("resume") != "pdf" else
+         "PDF only: most ATS read text-based PDFs, but .docx is the safest (set resume_format to both)"),
     ]
     checks = [{"check": c, "passed": bool(ok), "detail": d} for c, ok, d in checks]
     phrases = [p for p in data.get("job_requirements", {}).get("ats_phrases", []) if p]
@@ -1977,25 +2195,66 @@ def _open_in_editor(path: Path):
 
 
 def write_default_settings() -> bool:
-    if SETTINGS_FILE.exists():
-        return False
+    """Create the configuration file, or upgrade an old flat one (version 2.3 and earlier) in place."""
     HOME.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(json.dumps(DEFAULT_SETTINGS, indent=2), encoding="utf-8")
-    print(f"Created your settings file: {SETTINGS_FILE}")
-    return True
+    if not SETTINGS_FILE.exists():
+        SETTINGS_FILE.write_text(json.dumps(DEFAULT_SETTINGS, indent=2), encoding="utf-8")
+        print(f"Created your configuration file: {SETTINGS_FILE}")
+        return True
+    raw = read_settings_file()
+    upgraded = _merge(DEFAULT_SETTINGS, upgrade_settings(raw))
+    if upgraded != raw:
+        shutil.copy(SETTINGS_FILE, SETTINGS_FILE.with_suffix(".json.bak"))
+        SETTINGS_FILE.write_text(json.dumps(upgraded, indent=2), encoding="utf-8")
+        print(f"Updated your configuration file with the new options (your values are kept; "
+              f"the old file is {SETTINGS_FILE.name}.bak).")
+    return False
+
+
+SETTING_HELP = {
+    "anthropic_api_key": 'Your API key, used when ANTHROPIC_API_KEY is not set ("" = use the environment variable)',
+    "model": "Anthropic model",
+    "work_authorization": 'Line under your contact details ("" hides it)',
+    "documents.cover_letter": "Write a cover letter (false also saves one model call)",
+    "documents.requirements_document": "Write the JobRequirements breakdown",
+    "documents.resume_format": "docx, pdf or both",
+    "documents.cover_letter_format": "docx, pdf or both",
+    "documents.requirements_format": "docx, pdf or both",
+    "resume.max_pages": "Page limit for resumes",
+    "resume.shorten_role_first": 'Role to shorten first when too long ("" = oldest role)',
+    "resume.drop_bachelors_if_higher_degree": "Drop the Bachelor's when a higher degree is listed and still too long",
+    "conditions.min_fit_score": "Skip jobs that match your experience less than this % (0 = never)",
+    "conditions.skip_if_posting_mentions": "Skip postings that mention any of these (no model call)",
+    "conditions.skip_job_titles_with": 'Skip job titles containing any of these, e.g. ["VP", "Director"]',
+    "conditions.allowed_work_arrangements": 'Only these, e.g. ["Remote", "Hybrid"] ([] = any)',
+    "conditions.min_salary": "Skip jobs whose posted maximum (yearly) is below this (0 = off)",
+}
+
+
+def _show(value) -> str:
+    return json.dumps(value)
 
 
 def cmd_settings(args):
     write_default_settings()
-    print(f"Settings file: {SETTINGS_FILE}\n")
-    labels = {"work_authorization": "Line under your contact details (\"\" hides it)",
-              "model": "Anthropic model",
-              "max_resume_pages": "Page limit for resumes",
-              "shorten_role_first": "Role to shorten first when too long (\"\" = oldest role)",
-              "drop_bachelors_if_higher_degree": "Drop Bachelor's when a higher degree is listed and still too long",
-              "min_fit_score": "Skip jobs matching your experience less than this % (0 = never skip)"}
-    for key, label in labels.items():
-        print(f"  {key:34} = {json.dumps(SETTINGS.get(key))}\n  {'':34}   {label}")
+    global SETTINGS
+    SETTINGS.clear()
+    SETTINGS.update(load_settings())
+    print(f"Configuration file: {SETTINGS_FILE}\n")
+    section = None
+    for path, label in SETTING_HELP.items():
+        if "." in path and path.split(".")[0] != section:
+            section = path.split(".")[0]
+            print(f"  [{section}]")
+        value = cfg(path)
+        if path == "anthropic_api_key" and value:
+            value = str(value)[:10] + "..." + str(value)[-4:]
+        name = path.split(".")[-1]
+        indent = "    " if "." in path else "  "
+        width = 36 - len(indent)
+        print(f"{indent}{name:{width}} = {_show(value)}\n{indent}{'':{width}}   {label}")
+    for problem in settings_problems():
+        print(f"\n  !! {problem}")
     if any(k in os.environ for k in ("JOBPILOT_WORK_AUTH", "JOBPILOT_MODEL", "JOBAPPLY_WORK_AUTH", "JOBAPPLY_MODEL")):
         print("\n  Note: JOBPILOT_WORK_AUTH / JOBPILOT_MODEL environment variables are set and override this file.")
     if args.edit:
@@ -2025,13 +2284,20 @@ def cmd_check(args):
             line(True, "pywin32 (exact page counts from Word)")
         except ImportError:
             line(True, "pywin32 not installed: page counts are estimated (optional: pip install pywin32)")
-    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    line(bool(key), "ANTHROPIC_API_KEY is set" + (" (looks valid)" if key.startswith("sk-ant-") else ""),
+    key = api_key()
+    where = "ANTHROPIC_API_KEY" if os.environ.get("ANTHROPIC_API_KEY", "").strip() else "configuration file"
+    line(bool(key), f"API key is set ({where})" + (" (looks valid)" if key.startswith("sk-ant-") else ""),
          'setx ANTHROPIC_API_KEY "sk-ant-..." then open a new terminal' if sys.platform.startswith("win")
          else 'export ANTHROPIC_API_KEY="sk-ant-..." in ~/.zshrc or ~/.bashrc'); ok_all &= bool(key)
     line(BASE_TEXT.exists(), f"Base resume saved ({BASE_TEXT})", 'jobpilot setup --resume "My_Resume.docx"')
     ok_all &= BASE_TEXT.exists()
-    line(True, f"Settings: {SETTINGS_FILE if SETTINGS_FILE.exists() else 'defaults (no settings file yet)'}")
+    line(True, f"Configuration: {SETTINGS_FILE if SETTINGS_FILE.exists() else 'defaults (no file yet)'}")
+    for problem in settings_problems():
+        line(False, f"Configuration: {problem}", "jobpilot settings --edit"); ok_all = False
+    if any(doc_format(k) != "docx" for k in ("resume", "cover_letter", "requirements")):
+        pdf_ok = bool(_libreoffice_exe()) or sys.platform.startswith("win")
+        line(pdf_ok, "PDF output: Microsoft Word (with pywin32) or LibreOffice is needed",
+             "Install LibreOffice (free) or set the *_format settings to docx")
     rules = load_rules()
     ready = sum(1 for r in rules for c in _as_list(r.get("changes")) for b in _as_list(c.get("add_bullets"))
                 if b and not is_placeholder(b))
@@ -2044,10 +2310,10 @@ def save_settings(**changes):
     current = {}
     if SETTINGS_FILE.exists():
         current = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-    merged = {**DEFAULT_SETTINGS, **current, **changes}
+    merged = _merge(_merge(DEFAULT_SETTINGS, upgrade_settings(current)), changes)
     HOME.mkdir(parents=True, exist_ok=True)
     SETTINGS_FILE.write_text(json.dumps(merged, indent=2), encoding="utf-8")
-    SETTINGS.update(changes)
+    SETTINGS.update(_merge(SETTINGS, changes))
 
 
 def _ask(question: str, default: str = "") -> str:
@@ -2079,7 +2345,7 @@ def cmd_init(args):
     print(f"=== JobPilot {__version__} setup ===\n")
 
     print("1) Anthropic API key  (create one at https://console.anthropic.com > Settings > API Keys)")
-    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    key = api_key()
     if key.startswith("sk-ant-"):
         print("  Already set. Keeping it.")
     else:
@@ -2128,8 +2394,15 @@ def cmd_init(args):
     cmd_check(argparse.Namespace())
 
 
+def api_key() -> str:
+    """ANTHROPIC_API_KEY from the environment, else anthropic_api_key from the configuration file."""
+    return os.environ.get("ANTHROPIC_API_KEY", "").strip() or str(cfg("anthropic_api_key") or "").strip()
+
+
 def check_api_key():
-    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    key = api_key()
+    if key and not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        os.environ["ANTHROPIC_API_KEY"] = key  # from the configuration file; the Anthropic client reads it here
     if not key:
         windows = sys.platform.startswith("win")
         sys.exit("Your Anthropic API key is not set in this terminal.\n"
@@ -2139,6 +2412,7 @@ def check_api_key():
                     if windows else
                     '  Add to ~/.zshrc or ~/.bashrc:  export ANTHROPIC_API_KEY="sk-ant-api03-..."\n'
                     "  Then open a new terminal.")
+                 + "\n  Or put it in your configuration file as \"anthropic_api_key\" (jobpilot settings --edit)."
                  + "\n  Get a key at https://console.anthropic.com (Settings > API Keys).")
     if not key.startswith("sk-ant-"):
         print("Warning: ANTHROPIC_API_KEY does not look like an Anthropic API key (should start with sk-ant-).")
@@ -2344,16 +2618,21 @@ def cmd_tailor(args):
             return
         jobs = fresh
 
-    # Also skip links an earlier run found to be a poor fit for your experience.
-    min_fit = 0 if args.ignore_fit else int(SETTINGS.get("min_fit_score") or 0)
-    if jobs and min_fit:
+    # Also skip links an earlier run found to be a poor fit for your experience or your conditions.
+    screening = not args.ignore_fit
+    try:
+        min_fit = int(float(cfg("conditions.min_fit_score") or 0)) if screening else 0
+    except (TypeError, ValueError):
+        min_fit = 70
+    if jobs and screening:
         skips, keep = previous_skips(), []
         for job in jobs:
             row = skips.get(job_key(job) or "")
             if row:
-                print(f"Skipped before as not a fit ({row.get('Fit %')}%, {row.get('Date')}): "
+                fit_text = f"{row.get('Fit %')}%, " if row.get("Fit %") else ""
+                print(f"Skipped before as not a fit ({fit_text}{row.get('Date')}): "
                       f"{row.get('Company')} - {row.get('Job Title')}\n  {job}\n  Why: {row.get('Reason')}")
-                not_fit.append((job, f"not a fit ({row.get('Fit %')}%), skipped on {row.get('Date')}"))
+                not_fit.append((job, f"not a fit, skipped on {row.get('Date')}"))
             else:
                 keep.append(job)
         if not_fit:
@@ -2382,6 +2661,22 @@ def cmd_tailor(args):
                 print(f"  Skipped: {err}")
                 failed.append((job, str(err)))
 
+    # Your conditions: words that rule a posting out, checked before any model call.
+    if screening:
+        kept = []
+        for text, source in prepared:
+            hits = posting_mentions_blocked(text)
+            if hits:
+                print(f"Skipped by your conditions: {source}\n  The posting mentions: {', '.join(hits)} "
+                      "(conditions.skip_if_posting_mentions). No model call was made.")
+                not_fit.append((source, "posting mentions " + ", ".join(hits)))
+            else:
+                kept.append((text, source))
+        if prepared and not kept:
+            print("\nNothing to create.")
+            return
+        prepared = kept
+
     # Step 2: the model calls, in parallel when asked (each job takes about a minute).
     workers = max(1, min(args.parallel, 5, len(prepared) or 1))
     batch = len(prepared) > 1
@@ -2389,7 +2684,8 @@ def cmd_tailor(args):
         mode = f"{workers} at a time" if workers > 1 else "one after another"
         print(f"\nTailoring {len(prepared)} applications, {mode}...")
     else:
-        print("Tailoring your resume, writing the cover letter and breaking down the requirements...")
+        print("Tailoring your resume" + (", writing the cover letter" if cfg("documents.cover_letter", True) else "")
+              + " and breaking down the requirements...")
 
     # Same job under another link, a pasted description or a file: caught right after step 1/3
     # (company and job title), before the resume and cover letter are written.
@@ -2415,9 +2711,14 @@ def cmd_tailor(args):
         score = fit_score(analysis)
         if score is None:
             log("Note: the job analysis gave no fit score; continuing.")
+        else:
+            log(f"  Role fit: {score}%" + (f" (minimum {min_fit}%)" if min_fit else ""))
+        if not screening:
             return
-        log(f"  Role fit: {score}%" + (f" (minimum {min_fit}%)" if min_fit else ""))
-        if min_fit and score < min_fit:
+        reasons = condition_failures(analysis)
+        if reasons:
+            raise NotAFit(analysis, score, reasons)
+        if min_fit and score is not None and score < min_fit:
             raise NotAFit(analysis, score)
 
     def work(index, job_text, source):
@@ -2460,12 +2761,19 @@ def cmd_tailor(args):
             continue
         if isinstance(result, NotAFit):
             a = result.analysis
-            print(f"\nNot a fit, skipped: {a.get('job_title')} at {a.get('company')}\n  {source}\n  "
-                  + describe_fit(a, result.score)
-                  + f"\n  No resume or cover letter written (minimum fit is {min_fit}%). "
-                    "Use --ignore-fit to create it anyway.")
+            if result.reasons:
+                print(f"\nSkipped by your conditions: {a.get('job_title')} at {a.get('company')}\n  {source}\n  "
+                      + "\n  ".join(f"- {r}" for r in result.reasons)
+                      + "\n  No resume or cover letter written. Change the conditions with  jobpilot settings --edit"
+                        "  or use --ignore-fit.")
+                not_fit.append((source, "conditions: " + "; ".join(result.reasons)))
+            else:
+                print(f"\nNot a fit, skipped: {a.get('job_title')} at {a.get('company')}\n  {source}\n  "
+                      + describe_fit(a, result.score)
+                      + f"\n  No resume or cover letter written (minimum fit is {min_fit}%). "
+                        "Use --ignore-fit to create it anyway.")
+                not_fit.append((source, f"not a fit ({result.score}%)"))
             log_not_a_fit(result, source)
-            not_fit.append((source, f"not a fit ({result.score}%)"))
             continue
         if isinstance(result, Exception):
             print(f"\nFailed: {source}\n  {result}")
@@ -2537,7 +2845,7 @@ def main():
     p_tailor.add_argument("--force", action="store_true",
                           help="Create the application even if this job link was already done")
     p_tailor.add_argument("--ignore-fit", action="store_true",
-                          help="Create the application even if the job matches your experience less than min_fit_score")
+                          help="Create the application even if the job fails the fit check or your conditions")
     p_tailor.set_defaults(func=cmd_tailor)
 
     p_track = sub.add_parser("track", help="Add/refresh every application in Job_Application_Tracker.xlsx")

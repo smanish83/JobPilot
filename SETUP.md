@@ -7,6 +7,7 @@ Setup takes about 10 minutes. You only do it once.
 | Item | Details |
 |---|---|
 | A computer | Windows 10/11, macOS, or Linux |
+| For PDF output (optional) | Microsoft Word on Windows, or [LibreOffice](https://www.libreoffice.org) (free) on any system |
 | Python 3.10 or newer | Free from [python.org/downloads](https://www.python.org/downloads/) |
 | An Anthropic API key | From [console.anthropic.com](https://console.anthropic.com). API usage is pay-as-you-go and billed separately from a Claude.ai subscription. |
 | Your current resume | A `.docx` (best), `.pdf`, `.md` or `.txt` file |

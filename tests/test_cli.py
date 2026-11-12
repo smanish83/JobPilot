@@ -42,6 +42,6 @@ def test_tailor_without_api_key_explains_how_to_set_it(jp, run, monkeypatch, job
 def test_settings_lists_every_setting(jp, run, capsys):
     run("settings")
     out = capsys.readouterr().out
-    for key in ("work_authorization", "model", "max_resume_pages", "min_fit_score"):
+    for key in ("work_authorization", "model", "max_pages", "min_fit_score", "cover_letter", "resume_format"):
         assert key in out
     assert jp.SETTINGS_FILE.exists()
