@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.0 (unreleased)
+
+- **Sample resume.** `examples/sample_resume.docx` and `.txt`: a complete resume for a fictional QA engineer that shows the expected structure. `jobpilot setup --sample` (or typing `sample` in `jobpilot init`) loads it so you can try JobPilot end to end.
+
 ## 2.3.0 (2026-11-12)
 
 First public release as **JobPilot** (previously `jobapply`).

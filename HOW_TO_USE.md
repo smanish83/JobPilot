@@ -19,6 +19,7 @@ This guide assumes setup is done (see SETUP.md). Run every command from a termin
 | `jobpilot init` | Guided setup: API key, resume, work-authorization line |
 | `jobpilot check` | Checks everything is installed and set up |
 | `jobpilot setup --resume "My_Resume.docx"` | Saves (or replaces) your base resume |
+| `jobpilot setup --sample` | Uses the sample resume, so you can try JobPilot before setting up your own |
 | `jobpilot tailor "<link>"` | Creates one application |
 | `jobpilot tailor "<link1>" "<link2>" "<link3>"` | Several applications, one after another |
 | `jobpilot tailor "<link1>" "<link2>" --parallel 3` | Several applications, up to 3 at the same time |
@@ -40,6 +41,7 @@ This guide assumes setup is done (see SETUP.md). Run every command from a termin
 
 - **Everything JobPilot writes comes from this file** (plus your experience rules). It is never allowed to invent experience.
 - **Make it complete.** Open it in Notepad or any text editor and add every project, tool, metric and achievement you can honestly claim, even ones your current resume leaves out. JobPilot picks what fits each job and keeps the result to two pages.
+- **Sample resume.** `examples\sample_resume.docx` (and `.txt`) is a complete resume for a fictional QA engineer, Alex Morgan. It shows the structure JobPilot reads best. You can copy it as a template, or run `jobpilot setup --sample` to try JobPilot end to end before you use your own resume. **Never apply with it.**
 - **Keep the structure:** the section names (`Professional Summary`, `Core Skills`, `Professional Experience`, `Education`), then each job as a "Company - Location" line, a "Title | Month YYYY - Month YYYY" line and one achievement per line.
 - **Careful:** running `jobpilot setup` again replaces this file with the text of the Word resume you give it. Edits you made only in `base_resume.txt` are lost unless you also put them in that Word file.
 - **Close the file in your editor when you're done.** An open editor window can later save an old copy over your changes.

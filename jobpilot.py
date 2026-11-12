@@ -1937,7 +1937,16 @@ def cmd_rules(args):
         print("Open it for editing with:  jobpilot rules --edit")
 
 
+SAMPLE_RESUME = Path(__file__).resolve().parent / "examples" / "sample_resume.docx"
+
+
 def cmd_setup(args):
+    if getattr(args, "sample", False) or str(args.resume or "").strip().lower() == "sample":
+        args.resume = str(SAMPLE_RESUME)
+        print("Using the sample resume (Alex Morgan, a fictional QA engineer) so you can try JobPilot.")
+        print("Replace it with your own before applying:  jobpilot setup --resume \"My_Resume.docx\"\n")
+    if not args.resume:
+        sys.exit('Give your resume file:  jobpilot setup --resume "My_Resume.docx"   (or --sample to try the sample)')
     source = Path(args.resume)
     if not source.exists():
         sys.exit(f"File not found: {source}")
@@ -2090,12 +2099,13 @@ def cmd_init(args):
         print("  Keeping the saved base resume.")
     else:
         for _ in range(3):
-            path = _ask("  Path to your resume file (tip: drag the file into this window): ")
+            path = _ask("  Path to your resume file (tip: drag the file into this window),\n"
+                        "  or type  sample  to try JobPilot with a sample resume first: ")
             if not path:
                 print("  Skipped. Later run:  jobpilot setup --resume \"My_Resume.docx\"")
                 break
             try:
-                cmd_setup(argparse.Namespace(resume=path))
+                cmd_setup(argparse.Namespace(resume=path, sample=False))
                 break
             except SystemExit as err:
                 print(f"  {err}")
@@ -2513,7 +2523,9 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_setup = sub.add_parser("setup", help="Save your current resume as the base resume")
-    p_setup.add_argument("--resume", required=True, help="Your resume (.docx, .pdf, .md, .txt)")
+    p_setup.add_argument("--resume", help="Your resume (.docx, .pdf, .md, .txt)")
+    p_setup.add_argument("--sample", action="store_true",
+                         help="Use the sample resume in examples/ (a fictional QA engineer) to try JobPilot")
     p_setup.set_defaults(func=cmd_setup)
 
     p_tailor = sub.add_parser("tailor", help="Create a resume, cover letter and requirements doc for a job")

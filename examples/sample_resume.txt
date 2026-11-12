@@ -1,0 +1,43 @@
+Alex Morgan
+Senior QA Automation Engineer | Playwright, API Testing, CI/CD & AI-Assisted Testing
+Austin, TX | (555) 010-0199 | alex.morgan@example.com | https://www.linkedin.com/in/alex-morgan-example
+Professional Summary
+Senior QA Automation Engineer with 9 years of experience building test automation frameworks and test strategy for SaaS, e-commerce and fintech products. Builds Playwright, Selenium and Cypress frameworks in TypeScript, Python and Java for web, mobile and REST API testing, integrated into CI/CD pipelines (GitHub Actions, Jenkins). Cut regression time by 60% at Contoso Retail and mentors QA engineers on automation best practices. Uses AI assistants (GitHub Copilot, ChatGPT) to generate test cases and speed up test maintenance, reviewing every output.
+Core Skills
+Test Automation: Playwright, Selenium WebDriver, Cypress, Appium, Pytest, TestNG, Cucumber (BDD), Page Object Model
+API & Performance: REST API Testing, Postman, RestAssured, GraphQL, k6, JMeter
+Languages: TypeScript, JavaScript, Python, Java, SQL
+CI/CD & Cloud: GitHub Actions, Jenkins, Docker, AWS (S3, Lambda, CloudWatch), Git, Jira
+Testing: Functional, Regression, Integration, End-to-End (E2E), Cross-Browser, Accessibility (WCAG, axe-core), Exploratory, Risk-Based Testing, UAT
+Process & Leadership: Agile/Scrum, Test Strategy, Test Plans, Code Reviews, QA Metrics and KPIs, Mentorship
+Professional Experience
+Northwind Payments - Austin, TX (Hybrid)
+Senior QA Automation Engineer | March 2022 - Present
+Built a Playwright and TypeScript automation framework for web and REST API testing, integrated into GitHub Actions, running 1,200 tests on every pull request.
+Reduced flaky tests by 70% by introducing stable locators, test-data factories and automatic retries with failure screenshots and traces.
+Added k6 performance tests for the checkout API, catching two latency regressions before release.
+Integrated axe-core accessibility checks into the UI suite and worked with designers to fix WCAG 2.1 AA violations.
+Defined the team's test strategy and QA KPIs (automation coverage, escaped defects, pass rate) and reported them to engineering leadership.
+Set up nightly cross-browser runs on Chromium, Firefox and WebKit with parallel workers, keeping the full regression under 20 minutes.
+Partnered with developers in code reviews to add unit and integration tests for new payment features before release.
+Used GitHub Copilot and ChatGPT to draft test cases from user stories and acceptance criteria, reviewing every generated test before merging.
+Mentored three QA engineers through pairing and code reviews of test code.
+Contoso Retail - Dallas, TX
+QA Automation Engineer | June 2018 - February 2022
+Migrated a manual regression suite of 800 cases to Selenium WebDriver and Java with TestNG, cutting regression time by 60%.
+Built REST API tests with RestAssured and Postman collections, run in Jenkins pipelines on every build.
+Automated Android and iOS smoke tests with Appium on real devices in BrowserStack.
+Validated order and inventory data with SQL queries against PostgreSQL during releases.
+Worked in Agile/Scrum sprints with developers and product owners to review acceptance criteria and plan regression scope.
+Ran exploratory and risk-based testing sessions on new checkout features, logging 150+ defects with clear reproduction steps.
+Fabrikam Software - Dallas, TX
+QA Analyst | July 2016 - May 2018
+Wrote and executed functional, regression and UAT test cases for a B2B SaaS platform in an Agile/Scrum team.
+Reported and triaged defects in Jira and contributed Python scripts that generated test data.
+Built a smoke-test checklist used for every production deployment, reducing post-release hotfixes.
+Professional Development
+AI Testing (Self-Directed, 2025): LLM evaluation basics and prompt testing for AI features.
+Education
+Bachelor of Science in Computer Science | University of North Texas, Denton, TX | August 2012 - May 2016
+Certifications
+ISTQB Certified Tester Foundation Level (CTFL)

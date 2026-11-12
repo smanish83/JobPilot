@@ -35,7 +35,7 @@ Every application is also added to **`Job_Application_Tracker.xlsx`**, where you
    - Windows: double-click **`setup_windows.bat`**
    - Mac / Linux: open a terminal in this folder and run **`./setup_mac_linux.sh`**
 
-   The guided setup asks for your API key, your current resume and an optional work-authorization line, then checks that everything is ready.
+   The guided setup asks for your API key, your current resume and an optional work-authorization line, then checks that everything is ready. No resume handy? Type `sample` to try JobPilot with the included sample resume first.
 5. **Tailor your first application.** Open a terminal in this folder and run:
    ```
    jobpilot tailor "https://www.linkedin.com/jobs/view/1234567890/"
@@ -58,7 +58,7 @@ JobPilot/
 ├── jobpilot.py               the tool itself
 ├── requirements.txt          Python libraries it needs
 ├── pyproject.toml            for installing with pip instead (optional)
-├── examples/                 a sample job, a jobs list and a sample experience-rules file
+├── examples/                 a sample resume, a sample job, a jobs list and a sample experience-rules file
 ├── CHANGELOG.md              what changed in each version
 └── LICENSE                   MIT License
 ```

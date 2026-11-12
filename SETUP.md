@@ -58,7 +58,7 @@ chmod +x setup_mac_linux.sh
 The setup creates a private Python environment inside the folder (`.venv`), installs the libraries, then starts the **guided setup**, which asks you:
 
 1. **Your API key.** Paste it; it is hidden as you type. On Windows it is saved with `setx`. On Mac/Linux you are asked before it is added to `~/.zshrc` or `~/.bashrc`.
-2. **Your resume file.** Type the path, or drag the file into the window.
+2. **Your resume file.** Type the path, or drag the file into the window. To try JobPilot first, type `sample` to use the included sample resume (`examples/sample_resume.docx`, a fictional person), and replace it with yours later.
 3. **A work-authorization line** (optional). It appears under your contact details, for example `U.S. Work Authorized | No Visa Sponsorship Needed`. Press Enter to skip.
 4. **Experience rules** (optional). See HOW_TO_USE.md. You can create them later.
 
