@@ -56,6 +56,8 @@ jobpilot tailor "https://www.linkedin.com/jobs/view/1234567890/"
 ```
 LinkedIn links usually work directly. Indeed and some company sites block automatic reading. JobPilot then asks you to **paste the description**: copy the full text from your browser, paste it, then press **Ctrl+Z then Enter** (Windows) or **Ctrl+D** (Mac/Linux).
 
+When it finishes, the results are shown as tables: the application (company, job, location, role fit, ATS result, keyword coverage, pay, suggested ask, sponsorship, folder and files), the ATS checklist with **OK** or **FIX** for each check (so you can see exactly why a resume says *NEEDS ATTENTION*), and the gaps to prepare for.
+
 ### Already applied? Duplicates are skipped
 Before creating anything, JobPilot checks each job link against your tracker and your `applications` folder. If you've already prepared or applied for that job, it shows you when, the status, and the folder, then skips it, with no API cost. Links are matched by the posting's ID, so the same job still matches when its link carries different tracking codes (for example LinkedIn's `?trackingId=...`). This works for LinkedIn, Indeed, Dice, Greenhouse, Lever, Ashby and most company career sites.
 
@@ -87,7 +89,31 @@ jobpilot tailor "<link 1>" "<link 2>" "<link 3>" --parallel 3
 ```
 - On Windows Command Prompt, keep **all links on one line**. For long lists, use a file instead (below).
 - Without `--parallel`, the jobs run one after another. `--parallel N` runs up to N at a time (maximum 5). 2 or 3 is a good choice, because higher values can hit your API rate limit.
-- Postings are read first, one by one (you may be asked to paste a blocked one, or press Ctrl+Z / Ctrl+D right away to skip it). Then the applications are created. A failure never stops the other jobs. The summary at the end lists anything to re-run.
+- Postings are read first, one by one (you may be asked to paste a blocked one, or press Ctrl+Z / Ctrl+D right away to skip it). Then the applications are created. A failure never stops the other jobs.
+- At the end, one **summary table** shows every job on its own row:
+
+```
+Summary: 2 created, 1 already done, 1 not a fit
++---+--------------+-------------+---------------+-----+------+----------+----------+----------------------+
+| # | Result       | Company     | Job title     | Fit | ATS  | Keywords | Ask      | Folder / reason      |
++===+==============+=============+===============+=====+======+==========+==========+======================+
+| 1 | Created      | Quo         | QA Automation | 86% | FIX  | 75%      | $140,000 | Quo_QA_Automation_En |
+|   |              |             | Engineer      |     |      |          |          | gineer_Web           |
+|   |              |             | (SDET), Web   |     |      |          |          | fix: keywords 75%    |
++---+--------------+-------------+---------------+-----+------+----------+----------+----------------------+
+| 2 | Created      | Acme Health | Senior SDET   | 91% | PASS | 94%      | $152,000 | Acme_Health_Senior_S |
+|   |              |             |               |     |      |          |          | DET                  |
++---+--------------+-------------+---------------+-----+------+----------+----------+----------------------+
+| 3 | Already done | Contoso     | QA Engineer   | -   | -    | -        | -        | prepared 2026-11-05, |
+|   |              |             |               |     |      |          |          | status: Applied      |
++---+--------------+-------------+---------------+-----+------+----------+----------+----------------------+
+| 4 | Not a fit    | Delta Bank  | ATM           | 35% | -    | -        | -        | Core work is ATM     |
+|   |              |             | Automation    |     |      |          |          | hardware and         |
+|   |              |             | Engineer      |     |      |          |          | firmware validation  |
++---+--------------+-------------+---------------+-----+------+----------+----------+----------------------+
+```
+
+  **ATS** is PASS or FIX; for FIX, the last column names the failed checks (for example `keywords 75%`). Run that job on its own, or open its JobRequirements document, for the full checklist. Tables wrap to fit your terminal window; a wider window shows more on each line.
 
 ### A list of jobs in a file
 Create `jobs.txt` with one link (or description file) per line; lines starting with `#` are ignored (see `examples\jobs.txt`). Then run:

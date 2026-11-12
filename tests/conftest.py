@@ -96,6 +96,7 @@ def jp(tmp_path, monkeypatch):
     work = tmp_path / "work"
     work.mkdir()
     monkeypatch.chdir(work)
+    monkeypatch.setenv("COLUMNS", "220")  # wide tables, so each test can find a row on one line
     monkeypatch.setattr(jobpilot, "HOME", home)
     monkeypatch.setattr(jobpilot, "SETTINGS_FILE", home / "settings.json")
     monkeypatch.setattr(jobpilot, "BASE_TEXT", home / "base_resume.txt")

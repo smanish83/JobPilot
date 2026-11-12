@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.0 (2026-11-12)
+
+- **Results as tables.** A single job ends with a details table (company, job, location, fit, ATS result, keyword coverage, pay, suggested ask, sponsorship, folder and files), the ATS checklist with OK / FIX for each check, and a table of gaps. Several jobs end with one summary table: result, company, job title, fit, ATS, keyword coverage, suggested ask, and the folder or the reason it was skipped (for FIX, the failed checks are named). Tables wrap to the terminal width and use plain ASCII borders, so they show correctly in every terminal.
+
 ## 2.4.0 (2026-11-12)
 
 - **Study material, only when asked.** `--study` adds a study guide for the job: prioritized topics (gaps first), what to learn, a hands-on exercise, and links to the official docs (each checked) and to course and video searches on YouTube, Pluralsight, LinkedIn Learning, Coursera and Udemy. `--questions` adds an Interview Q&A document with likely questions and model answers based on your resume. Both default to PDF. Turn them on for every job in the `study_material` section, make them later with `jobpilot study <folder>`, or skip them for one run with `--no-study`.

@@ -77,7 +77,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-__version__ = "2.4.0"
+__version__ = "2.5.0"
 HOME = Path.home() / ".resume_agent"
 SETTINGS_FILE = HOME / "settings.json"
 DEFAULT_SETTINGS = {
@@ -2882,24 +2882,159 @@ def _tailor_one(job_text: str, source: str, base_resume: str, rules: list[dict],
     return data
 
 
+# ---------------------------------------------------------------------------
+# Terminal tables
+# ---------------------------------------------------------------------------
+def _terminal_width() -> int:
+    return max(60, shutil.get_terminal_size((110, 24)).columns - 1)
+
+
+def format_table(headers: list[str], rows: list[list], title: str = "", width: int | None = None) -> str:
+    """A plain-text table that fits the terminal: long cells wrap inside their column.
+    ASCII borders, so it shows correctly in every Windows, macOS and Linux terminal."""
+    import textwrap
+    width = width or _terminal_width()
+    cols = len(headers)
+    cells = [[str(c) if c is not None else "" for c in row] for row in rows]
+
+    def longest(text: str) -> int:
+        return max((len(line) for line in text.splitlines()), default=0)
+
+    natural = [max(1, max([longest(headers[i])] + [longest(r[i]) for r in cells])) for i in range(cols)]
+    widths = natural[:]
+    # Columns never get narrower than their longest header word (or 8); long text columns give up space
+    # in proportion to their length, so short columns (numbers, PASS/FIX) stay on one line.
+    floor = [natural[i] if natural[i] <= 12 else max(10, max((len(w) for w in headers[i].split()), default=1))
+             for i in range(cols)]
+    while sum(widths) + 3 * cols + 1 > width:
+        shrinkable = [i for i in range(cols) if widths[i] > floor[i]]
+        if not shrinkable:
+            break
+        loosest = max(shrinkable, key=lambda i: (widths[i] / natural[i], widths[i]))
+        widths[loosest] -= 1
+
+    def wrap(text: str, w: int) -> list[str]:
+        lines = []
+        for part in text.splitlines() or [""]:
+            lines.extend(textwrap.wrap(part, w, break_long_words=True, break_on_hyphens=False) or [""])
+        return lines
+
+    def render(row: list[str]) -> list[str]:
+        wrapped = [wrap(row[i], widths[i]) for i in range(cols)]
+        height = max(len(w) for w in wrapped)
+        return ["| " + " | ".join((wrapped[i][n] if n < len(wrapped[i]) else "").ljust(widths[i])
+                                  for i in range(cols)) + " |" for n in range(height)]
+
+    rule = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+    body = [render(row) for row in cells]
+    separate = any(len(lines) > 1 for lines in body)  # lines between rows only when some row wraps
+    out = [title] if title else []
+    out += [rule, *render(headers), rule.replace("-", "=")]
+    for lines in body:
+        out += lines
+        if separate:
+            out.append(rule)
+    if not separate:
+        out.append(rule)
+    return "\n".join(out)
+
+
+def print_table(headers: list[str], rows: list[list], title: str = ""):
+    print(format_table(headers, rows, title))
+
+
+SHORT_CHECKS = {"Required-keyword coverage of 80% or more": "keywords",
+                "Job title from the posting in headline or summary": "job title",
+                "Email and phone in the document body": "contact",
+                "Consistent date format (Month YYYY - Month YYYY)": "dates",
+                "No unusual symbols or emoji": "symbols",
+                "Length about 1-2 pages (450-1200 words)": "length"}
+
+
+def ats_label(ats: dict) -> str:
+    if not ats.get("checks"):
+        return "-"
+    return "PASS" if ats.get("passed") else "FIX"
+
+
+def ats_problems(ats: dict) -> str:
+    """Short names of the failed ATS checks, e.g. 'fix: keywords 75%, dates'."""
+    failed = []
+    for c in ats.get("checks", []):
+        if not c["passed"]:
+            name = SHORT_CHECKS.get(c["check"], c["check"])
+            if name == "keywords":
+                name += f" {ats.get('required_score', ats.get('score', 0))}%"
+            failed.append(name)
+    return ("fix: " + ", ".join(failed)) if failed else ""
+
+
+def _ask_text(data: dict) -> str:
+    sal = data.get("salary")
+    return money(sal["suggested"], sal["period"]) if sal else "-"
+
+
+def _fit_text(score) -> str:
+    return f"{score}%" if isinstance(score, (int, float)) else "-"
+
+
+def summary_row(result: str, company: str = "", title: str = "", fit=None, ats: dict | None = None,
+                ask: str = "-", notes: str = "") -> list:
+    ats = ats or {}
+    keywords = f"{ats.get('required_score', ats.get('score'))}%" if ats.get("total") else "-"
+    return [result, company or "-", title or "-", _fit_text(fit), ats_label(ats), keywords, ask, notes]
+
+
+SUMMARY_HEADERS = ["Result", "Company", "Job title", "Fit", "ATS", "Keywords", "Ask", "Folder / reason"]
+
+
+def print_summary(rows: list[list], created: int):
+    numbered = [[str(n)] + row for n, row in enumerate(rows, 1)]
+    counts = {}
+    for row in rows:
+        counts[row[0]] = counts.get(row[0], 0) + 1
+    totals = ", ".join(f"{n} {label.lower()}" for label, n in counts.items())
+    print()
+    print_table(["#"] + SUMMARY_HEADERS, numbered, title=f"Summary: {totals}")
+    if any(r[0] == "Created" and r[4] == "FIX" for r in rows):
+        print("ATS = FIX: open the JobRequirements document (ATS checklist) or run a single job for the details.")
+    if any(r[0] in ("Failed", "Couldn't read") for r in rows):
+        print("Re-run just the failed links (or use --paste for a blocked page).")
+    if any(r[0] in ("Not a fit", "Skipped") for r in rows):
+        print(f"Skipped jobs are listed in {skip_log_path()}. Use --ignore-fit to create one anyway.")
+    if any(r[0] == "Already done" for r in rows):
+        print("Use --force to create an application again.")
+
+
 def _report(folder: Path, data: dict, detailed: bool):
+    """The details of one finished application, as tables (single job runs)."""
     saved = json.loads((folder / "content.json").read_text(encoding="utf-8"))
-    print(f"\nDone: {data['job_title']} at {data['company']}  ->  {folder}")
     if not detailed:
-        ats = saved.get("ats", {})
-        line = f"  ATS: {'PASS' if ats.get('passed') else 'NEEDS ATTENTION'}"
-        if saved.get("salary"):
-            line += f"  |  Suggested ask: {money(saved['salary']['suggested'], saved['salary']['period'])}"
-        print(line)
         return
-    for file in sorted(list(folder.glob("*.docx")) + list(folder.glob("*.pdf"))):
-        print(f"  {file}")
-    print_ats(saved.get("ats", {}))
-    if saved.get("salary"):
-        print(f"\nSalary: posted {saved['job_requirements'].get('compensation')}")
-        print(f"  Suggested ask: {salary_text(saved['salary'])}")
+    req = saved.get("job_requirements", {})
+    ats = saved.get("ats", {})
+    files = sorted(p.name for p in list(folder.glob("*.docx")) + list(folder.glob("*.pdf")))
+    rows = [["Company", saved.get("company", "")],
+            ["Job title", saved.get("job_title", "")],
+            ["Location", " | ".join(x for x in (saved.get("job_location"), req.get("work_arrangement")) if x)],
+            ["Role fit", _fit_text(saved.get("fit_score"))],
+            ["ATS result", ("PASS" if ats.get("passed") else "NEEDS ATTENTION") if ats.get("checks") else "-"],
+            ["Required keywords", f"{ats.get('required_score', 0)}% "
+                                  f"({len(ats.get('found', []))} of {ats.get('total', 0)} posting keywords found)"
+                                  if ats.get("total") else "-"],
+            ["Pay (posting)", req.get("compensation") or "Not listed"],
+            ["Suggested ask", salary_text(saved.get("salary"))],
+            ["Sponsorship (posting)", req.get("sponsorship") or "Not listed"],
+            ["Folder", str(folder)],
+            ["Files", "\n".join(files)]]
+    if saved.get("rules_applied"):
+        rows.insert(9, ["Experience rules", "; ".join(saved["rules_applied"])])
+    print()
+    print_table(["Item", "Details"], rows, title="Done")
+    print_ats(ats)
     if data.get("gaps"):
-        print("\nGaps to prepare for:\n  - " + "\n  - ".join(data["gaps"]))
+        print()
+        print_table(["#", "Gaps to prepare for"], [[str(n), g] for n, g in enumerate(data["gaps"], 1)])
 
 
 def cmd_tailor(args):
@@ -2912,12 +3047,17 @@ def cmd_tailor(args):
 
     # Step 0: skip jobs you already prepared or applied for (compared by job link).
     duplicates, not_fit = [], []
+    summary = []  # one row per job for the table at the end
     if jobs and not args.force:
         previous, batch_keys, fresh = previous_applications(), set(), []
         for job in jobs:
             key = job_key(job)
             if key and key in previous:
                 duplicates.append((job, previous[key]))
+                prev = previous[key]
+                summary.append(summary_row("Already done", prev.get("company"), prev.get("title"),
+                                           notes=f"prepared {prev.get('date') or '?'}"
+                                                 + (f", status: {prev['status']}" if prev.get("status") else "")))
             elif key and key in batch_keys:
                 continue  # the same posting twice in this list
             else:
@@ -2930,6 +3070,8 @@ def cmd_tailor(args):
             print("To create it again anyway, add --force.\n")
         if not fresh:
             print("Nothing new to create.")
+            if len(summary) > 1:
+                print_summary(summary, 0)
             return
         jobs = fresh
 
@@ -2948,12 +3090,17 @@ def cmd_tailor(args):
                 print(f"Skipped before as not a fit ({fit_text}{row.get('Date')}): "
                       f"{row.get('Company')} - {row.get('Job Title')}\n  {job}\n  Why: {row.get('Reason')}")
                 not_fit.append((job, f"not a fit, skipped on {row.get('Date')}"))
+                summary.append(summary_row("Not a fit", row.get("Company"), row.get("Job Title"),
+                                           fit=int(row["Fit %"]) if str(row.get("Fit %") or "").isdigit() else None,
+                                           notes=f"skipped on {row.get('Date')}: {row.get('Reason')}"))
             else:
                 keep.append(job)
         if not_fit:
             print("To create it anyway, add --ignore-fit.\n")
         if not keep:
             print("Nothing new to create.")
+            if len(summary) > 1:
+                print_summary(summary, 0)
             return
         jobs = keep
 
@@ -2975,6 +3122,7 @@ def cmd_tailor(args):
                     sys.exit(f"Stopped: {err}.")
                 print(f"  Skipped: {err}")
                 failed.append((job, str(err)))
+                summary.append(summary_row("Couldn't read", notes=f"{job}: {err}"))
 
     # Your conditions: words that rule a posting out, checked before any model call.
     if screening:
@@ -2985,10 +3133,13 @@ def cmd_tailor(args):
                 print(f"Skipped by your conditions: {source}\n  The posting mentions: {', '.join(hits)} "
                       "(conditions.skip_if_posting_mentions). No model call was made.")
                 not_fit.append((source, "posting mentions " + ", ".join(hits)))
+                summary.append(summary_row("Skipped", notes=f"{source}: posting mentions {', '.join(hits)}"))
             else:
                 kept.append((text, source))
         if prepared and not kept:
             print("\nNothing to create.")
+            if len(summary) > 1:
+                print_summary(summary, 0)
             return
         prepared = kept
 
@@ -3073,6 +3224,9 @@ def cmd_tailor(args):
                   f"  -> applications/{prev.get('folder', '')}  (skipped after the job analysis; "
                   f"no resume or cover letter written. Use --force to create it anyway.)")
             duplicates.append((source, prev))
+            summary.append(summary_row("Already done", prev.get("company"), prev.get("title"),
+                                       notes=f"prepared {prev.get('date') or '?'}"
+                                             + (f", status: {prev['status']}" if prev.get("status") else "")))
             continue
         if isinstance(result, NotAFit):
             a = result.analysis
@@ -3082,17 +3236,24 @@ def cmd_tailor(args):
                       + "\n  No resume or cover letter written. Change the conditions with  jobpilot settings --edit"
                         "  or use --ignore-fit.")
                 not_fit.append((source, "conditions: " + "; ".join(result.reasons)))
+                summary.append(summary_row("Skipped", a.get("company"), a.get("job_title"), fit=result.score,
+                                           notes="; ".join(result.reasons)))
             else:
                 print(f"\nNot a fit, skipped: {a.get('job_title')} at {a.get('company')}\n  {source}\n  "
                       + describe_fit(a, result.score)
                       + f"\n  No resume or cover letter written (minimum fit is {min_fit}%). "
                         "Use --ignore-fit to create it anyway.")
                 not_fit.append((source, f"not a fit ({result.score}%)"))
+                fit = a.get("fit") or {}
+                summary.append(summary_row("Not a fit", a.get("company"), a.get("job_title"), fit=result.score,
+                                           notes="; ".join([str(b) for b in fit.get("blockers") or [] if str(b).strip()]
+                                                           + [fit.get("reason", "")]).strip("; ")))
             log_not_a_fit(result, source)
             continue
         if isinstance(result, Exception):
             print(f"\nFailed: {source}\n  {result}")
             failed.append((source, str(result)))
+            summary.append(summary_row("Failed", notes=f"{source}: {result}"))
             continue
         try:
             folder = write_application(result)
@@ -3101,34 +3262,37 @@ def cmd_tailor(args):
                 raise
             print(f"\nFailed to save: {source}\n  {err}")
             failed.append((source, str(err)))
+            summary.append(summary_row("Failed", result.get("company"), result.get("job_title"), notes=str(err)))
             continue
         _report(folder, result, detailed=not batch)
         done.append(folder)
+        saved = json.loads((folder / "content.json").read_text(encoding="utf-8"))
+        summary.append(summary_row("Created", saved.get("company"), saved.get("job_title"), fit=saved.get("fit_score"),
+                                   ats=saved.get("ats"), ask=_ask_text(saved),
+                                   notes="\n".join(x for x in (re.sub(r"^\d{4}-\d{2}-\d{2}_", "", folder.name),
+                                                                 ats_problems(saved.get("ats", {}))) if x)))
 
-    if len(jobs) > 1 or failed or duplicates or not_fit:
-        extra = f", {len(duplicates)} already done" if duplicates else ""
-        extra += f", {len(not_fit)} not a fit (see {skip_log_path()})" if not_fit else ""
-        print(f"\nFinished: {len(done)} created, {len(failed)} failed or skipped{extra}.")
-        for source, reason in failed:
-            print(f"  - {source}: {reason}")
-        if failed:
-            print("Re-run just those links (or use --paste for a blocked page).")
+    # One table for the whole run (a single created job already got its detail tables).
+    if len(summary) > 1 or (summary and summary[0][0] != "Created"):
+        print_summary(summary, len(done))
 
 
 def print_ats(ats: dict):
     if not ats.get("checks"):
         return
-    print(f"\nATS compliance: {'PASS' if ats['passed'] else 'NEEDS ATTENTION'}")
-    for c in ats["checks"]:
-        print(f"  [{'x' if c['passed'] else ' '}] {c['check']}: {c['detail']}")
+    rows = [[c["check"], "OK" if c["passed"] else "FIX", c["detail"]] for c in ats["checks"]]
     if ats.get("missing"):
-        print("  Posting keywords not in your resume (real gaps, not added): " + ", ".join(ats["missing"]))
+        rows.append(["Posting keywords not in your resume", "GAP",
+                     ", ".join(ats["missing"]) + " (real gaps: never added)"])
     if ats.get("phrases_found") or ats.get("phrases_missing"):
         n = len(ats.get("phrases_found", [])); total = n + len(ats.get("phrases_missing", []))
-        print(f"  Posting wording mirrored: {n} of {total} phrases")
+        detail = f"{n} of {total} phrases"
         if ats.get("phrases_missing"):
-            print("  Not mirrored (no matching experience found, or worded differently): "
-                  + "; ".join(ats["phrases_missing"]))
+            detail += ". Not mirrored (no matching experience, or worded differently): " + "; ".join(ats["phrases_missing"])
+        rows.append(["Posting wording mirrored", "INFO", detail])
+    print()
+    print_table(["ATS check", "Result", "Details"], rows,
+                title=f"ATS compliance: {'PASS' if ats['passed'] else 'NEEDS ATTENTION'}")
 
 
 def cmd_study(args):
