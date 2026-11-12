@@ -16,9 +16,34 @@
   },
   "conditions": {
     "min_fit_score": 70,
-    "skip_if_posting_mentions": ["security clearance", "TS/SCI"],
-    "skip_job_titles_with": ["VP", "Vice President", "Director", "Intern"],
-    "allowed_work_arrangements": ["Remote", "Hybrid"],
+    "skip_if_posting_mentions": [
+      "security clearance",
+      "TS/SCI"
+    ],
+    "skip_job_titles_with": [
+      "VP",
+      "Vice President",
+      "Director",
+      "Intern"
+    ],
+    "allowed_work_arrangements": [
+      "Remote",
+      "Hybrid"
+    ],
     "min_salary": 110000
+  },
+  "study_material": {
+    "enabled": false,
+    "learning_links": true,
+    "link_sources": [
+      "YouTube",
+      "Pluralsight",
+      "LinkedIn Learning",
+      "Coursera",
+      "Udemy"
+    ],
+    "interview_questions": false,
+    "question_count": 25,
+    "format": "pdf"
   }
 }

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 JobPilot - Tailor your base resume to a job, write a matching cover letter,
-and create a job requirements document, all as Word (.docx) files named after the job.
+and create a job requirements document (Word and/or PDF), named after the job.
+On request, also a study guide with learning links and an interview Q&A.
 
 See README.md, SETUP.md and HOW_TO_USE.md for the full guides.
 
@@ -9,6 +10,12 @@ ONE-TIME SETUP
     Windows: double-click setup_windows.bat     Mac/Linux: ./setup_mac_linux.sh
     (installs everything, then runs the guided setup:  jobpilot init)
     Check it any time with:  jobpilot check
+    Try it first with the sample resume:  jobpilot setup --sample
+
+CONFIGURATION
+    jobpilot settings --edit   opens ~/.resume_agent/settings.json:
+    documents (cover letter on/off, docx/pdf/both), resume (page limit), conditions (fit score,
+    words/titles to skip, work arrangement, minimum salary), study_material, optional API key.
 
 EXPERIENCE RULES (optional, one time)
     jobpilot rules --edit
@@ -52,8 +59,13 @@ OUTPUT  ->  applications/<YYYY-MM-DD>_<Company>_<Job_Title>/     (date = applica
                    - job details, responsibilities, required/preferred qualifications
                      with how you match each one, gaps, likely interview topics,
                      and the full original posting (kept in case it is taken down)
-    content.json   - the generated text; edit it, then rebuild the Word files with:
+    StudyGuide_... / InterviewQA_...   only with --study / --questions (or the configuration),
+                     or later:  jobpilot study "applications/<folder>"
+    content.json   - the generated text; edit it, then rebuild the documents with:
                      jobpilot render "applications/<folder>/content.json"
+
+TESTS
+    pip install -r requirements-dev.txt  then  python -m pytest   (no API key or internet needed)
 """
 import argparse
 import json
@@ -65,7 +77,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 HOME = Path.home() / ".resume_agent"
 SETTINGS_FILE = HOME / "settings.json"
 DEFAULT_SETTINGS = {

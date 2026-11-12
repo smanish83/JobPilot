@@ -159,15 +159,33 @@ Everything you can change lives in one file: `.resume_agent\settings.json` in yo
   "anthropic_api_key": "",
   "model": "claude-sonnet-5-5",
   "work_authorization": "U.S. Work Authorized | No Visa Sponsorship Needed",
-  "documents": { "cover_letter": true, "requirements_document": true,
-                 "resume_format": "both", "cover_letter_format": "pdf", "requirements_format": "docx" },
-  "resume": { "max_pages": 2, "shorten_role_first": "", "drop_bachelors_if_higher_degree": true },
-  "conditions": { "min_fit_score": 70, "skip_if_posting_mentions": ["security clearance"],
-                  "skip_job_titles_with": ["VP", "Director"], "allowed_work_arrangements": ["Remote", "Hybrid"],
-                  "min_salary": 110000 },
-  "study_material": { "enabled": false, "learning_links": true,
-                      "link_sources": ["YouTube", "Pluralsight", "LinkedIn Learning", "Coursera", "Udemy"],
-                      "interview_questions": false, "question_count": 25, "format": "pdf" }
+  "documents": {
+    "cover_letter": true,
+    "requirements_document": true,
+    "resume_format": "both",
+    "cover_letter_format": "pdf",
+    "requirements_format": "docx"
+  },
+  "resume": {
+    "max_pages": 2,
+    "shorten_role_first": "",
+    "drop_bachelors_if_higher_degree": true
+  },
+  "conditions": {
+    "min_fit_score": 70,
+    "skip_if_posting_mentions": ["security clearance", "TS/SCI"],
+    "skip_job_titles_with": ["VP", "Vice President", "Director", "Intern"],
+    "allowed_work_arrangements": ["Remote", "Hybrid"],
+    "min_salary": 110000
+  },
+  "study_material": {
+    "enabled": false,
+    "learning_links": true,
+    "link_sources": ["YouTube", "Pluralsight", "LinkedIn Learning", "Coursera", "Udemy"],
+    "interview_questions": false,
+    "question_count": 25,
+    "format": "pdf"
+  }
 }
 ```
 
@@ -177,7 +195,9 @@ Everything you can change lives in one file: `.resume_agent\settings.json` in yo
 |---|---|---|
 | `anthropic_api_key` | `""` | Your API key. Used only when the `ANTHROPIC_API_KEY` environment variable is not set. The file is plain text, so keep it private and never share or commit it. |
 | `model` | `claude-sonnet-5-5` | The Anthropic model used |
-| `work_authorization` | `""` | A line under your contact details, e.g. `U.S. Work Authorized \| No Visa Sponsorship Needed`. Empty means hidden. When set, the cover letter also says you need no sponsorship. |
+| `work_authorization` | `""` | A line under your contact details (example below). Empty means hidden. When set, the cover letter also says you need no sponsorship. |
+
+Example work-authorization line: `U.S. Work Authorized | No Visa Sponsorship Needed`
 
 **documents**: what is created, and in which format
 
@@ -230,6 +250,7 @@ JobPilot can also help you prepare, **only when you ask for it**. Nothing extra 
 | No study material this run, although the configuration turns it on | `--no-study` |
 
 **StudyGuide_...pdf** lists 6-12 topics for *this* job, most important first: your Gap and Partial requirements, the job's core tools, then what interviewers will probe. Each topic says why it matters, what exactly to learn, a small hands-on exercise, and **links**:
+
 - the official documentation, when the tool has it (each link is checked when the guide is made, so it never points to a page that doesn't exist);
 - searches for the topic on **YouTube, Pluralsight, LinkedIn Learning, Coursera and Udemy** (pick the sites in `link_sources`). Search links always work and show the newest courses; choose a recent, well-rated one. Pluralsight, LinkedIn Learning, Coursera and Udemy may need a subscription or a free trial.
 
