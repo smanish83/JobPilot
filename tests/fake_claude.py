@@ -11,10 +11,13 @@ import sys
 
 args = sys.argv[1:]
 with open(os.environ["FAKE_CLAUDE_LOG"], "a", encoding="utf-8") as log:
-    log.write(json.dumps({"args": args, "cwd": os.getcwd(), "files": sorted(os.listdir("."))}) + "\n")
+    log.write(json.dumps({"args": args, "cwd": os.getcwd(), "files": sorted(os.listdir(".")),
+                          "env_key": "ANTHROPIC_API_KEY" in os.environ}) + "\n")
 
 if args[:2] == ["auth", "status"]:
     status = json.loads(os.environ.get("FAKE_CLAUDE_STATUS", '{"loggedIn": false, "authMethod": "none"}'))
+    if "ANTHROPIC_API_KEY" in os.environ:  # like Claude Code: an API key in the environment wins
+        status = {"loggedIn": True, "authMethod": "api_key"}
     print(json.dumps(status))
     sys.exit(0 if status.get("loggedIn") else 1)
 

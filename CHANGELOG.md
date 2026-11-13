@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.1 (2026-11-13)
+
+- **Fix: the Claude Code sign-in is really used.** Claude Code uses `ANTHROPIC_API_KEY` ahead of your account sign-in whenever that variable is set, so with a key set (for example with `setx`), requests still went to the API key ("Using: Claude Code CLI (the API key Claude Code uses)"). JobPilot now leaves that variable out of Claude Code's environment, so Claude Code uses your sign-in. If Claude Code has no sign-in of its own, JobPilot uses the environment key directly, as before.
+- `jobpilot tailor jobs.txt` now recognizes a file of links (or job files) and runs each job, the same as `--file jobs.txt`. A job description saved as `.txt` is still read as one posting.
+
 ## 2.6.0 (2026-11-13)
 
 - **Use your Claude Code sign-in.** JobPilot now looks for a connection in this order: a local API key in the configuration file, then Claude Code (`claude`) installed and signed in, then the `ANTHROPIC_API_KEY` environment variable, and only then asks for a key. Through Claude Code no API key is needed: requests run with `claude -p` from an empty temporary folder, with Claude Code's tools turned off, and count toward that account's usage limits. Older Claude Code versions that lack some flags still work.

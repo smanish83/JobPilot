@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jobpilot"
-version = "2.6.0"
+version = "2.6.1"
 description = "Tailor your resume, write a cover letter and track job applications with Claude (Word output, ATS checks)"
 readme = "README.md"
 license = { file = "LICENSE" }

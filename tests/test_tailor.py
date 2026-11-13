@@ -134,3 +134,15 @@ def test_render_rebuilds_without_model_calls(jp, fake_model, job_file, run):
     run("render", content)
     assert fake_model.calls == []
     assert len(list(folder.glob("*.docx"))) == 3
+
+
+def test_a_list_file_given_without_file_is_read_as_a_list(jp, fake_model, run, capsys):
+    Path("job_a.txt").write_text("Posting A", encoding="utf-8")
+    Path("jobs.txt").write_text("# my jobs\njob_a.txt\nhttps://www.linkedin.com/jobs/view/4111111111/"
+                                "https://www.linkedin.com/jobs/view/4222222222/\n", encoding="utf-8")
+    assert jp._list_file_entries(Path("jobs.txt")) == [
+        "job_a.txt", "https://www.linkedin.com/jobs/view/4111111111/", "https://www.linkedin.com/jobs/view/4222222222/"]
+
+
+def test_a_job_description_file_is_not_mistaken_for_a_list(jp, job_file):
+    assert jp._list_file_entries(job_file) is None

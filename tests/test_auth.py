@@ -61,7 +61,23 @@ def test_claude_cli_is_used_when_signed_in(jp, fake_cli, job_file, run, capsys, 
 
 def test_cli_comes_before_the_environment_variable(jp, fake_cli, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-env")
-    assert jp.resolve_auth()["method"] == "claude_cli"
+    auth = jp.resolve_auth()
+    assert auth["method"] == "claude_cli"
+    assert auth["authMethod"] == "claude.ai"  # the account sign-in, not the API key from the environment
+
+
+def test_api_key_in_the_environment_is_hidden_from_claude_code(jp, fake_cli, job_file, run, capsys, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-env")  # e.g. set with setx on Windows
+    run("tailor", job_file)
+    assert "Using: Claude Code CLI (your Claude account sign-in)" in capsys.readouterr().out
+    assert fake_cli() and not any(call["env_key"] for call in fake_cli() + fake_cli("auth"))
+
+
+def test_cli_without_a_sign_in_falls_back_to_the_env_key_directly(jp, fake_cli, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_STATUS", json.dumps({"loggedIn": False, "authMethod": "none"}))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-env")
+    auth = jp.resolve_auth()
+    assert auth["method"] == "api_key" and auth["source"] == "env"
 
 
 def test_local_key_comes_before_the_cli(jp, fake_cli, job_file, run, capsys):

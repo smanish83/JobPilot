@@ -38,7 +38,7 @@ Setup takes about 10 minutes. You only do it once.
 JobPilot looks for a connection in this order and uses the first one it finds:
 
 1. **A local API key** saved in your configuration file (`anthropic_api_key`).
-2. **Claude Code** (the `claude` command), installed and signed in. JobPilot sends its requests through it, so your Claude Code sign-in (for example your Claude subscription) is used and **no API key is needed**. To set it up, [install Claude Code](https://code.claude.com/docs/en/setup), then run `claude auth login` once. `claude auth status` shows whether you are signed in.
+2. **Claude Code** (the `claude` command), installed and signed in. JobPilot sends its requests through it, so your Claude Code sign-in (for example your Claude subscription) is used and **no API key is needed**. This works even when `ANTHROPIC_API_KEY` is set: JobPilot hides that variable from Claude Code, which would otherwise use it instead of your sign-in. To set it up, [install Claude Code](https://code.claude.com/docs/en/setup), then run `claude auth login` once. `claude auth status` shows whether you are signed in.
 3. **The `ANTHROPIC_API_KEY` environment variable.**
 4. If none of these is found, JobPilot asks you for an API key (and can save it in the configuration file).
 

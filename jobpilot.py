@@ -81,7 +81,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-__version__ = "2.6.0"
+__version__ = "2.6.1"
 HOME = Path.home() / ".resume_agent"
 SETTINGS_FILE = HOME / "settings.json"
 DEFAULT_SETTINGS = {
@@ -2753,6 +2753,15 @@ def find_claude_cli() -> str | None:
     return None
 
 
+# Claude Code uses ANTHROPIC_API_KEY ahead of your account sign-in whenever that variable is set, so it is left
+# out of Claude Code's environment: the CLI then uses your sign-in (e.g. your Claude subscription).
+HIDDEN_FROM_CLI = ("ANTHROPIC_API_KEY",)
+
+
+def cli_env() -> dict:
+    return {k: v for k, v in os.environ.items() if k not in HIDDEN_FROM_CLI}
+
+
 def claude_cli_status(exe: str | None = None) -> dict | None:
     """`claude auth status` as a dict when Claude Code is installed and signed in, else None."""
     import subprocess
@@ -2761,7 +2770,7 @@ def claude_cli_status(exe: str | None = None) -> dict | None:
         return None
     try:
         done = subprocess.run([exe, "auth", "status"], capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=30)
+                              errors="replace", timeout=30, env=cli_env())
     except (OSError, subprocess.SubprocessError):
         return None
     try:
@@ -2777,7 +2786,7 @@ def claude_cli_status(exe: str | None = None) -> dict | None:
 def describe_auth(auth: dict) -> str:
     if auth["method"] == "claude_cli":
         how = {"claude.ai": "your Claude account sign-in", "oauth_token": "a Claude sign-in token",
-               "api_key": "the API key Claude Code uses", "api_key_helper": "Claude Code's API key helper",
+               "api_key": "an API key saved in Claude Code", "api_key_helper": "Claude Code's API key helper",
                "third_party": "Claude Code's cloud provider"}.get(auth.get("authMethod"), "its sign-in")
         return f"Claude Code CLI ({how})"
     return {"config": "local API key (configuration file)", "env": "API key (ANTHROPIC_API_KEY)",
@@ -2904,7 +2913,7 @@ class ClaudeCLIClient:
             for command in (base + extras, base):  # older Claude Code versions may not know every extra flag
                 try:
                     done = subprocess.run(command, input=prompt, capture_output=True, text=True, encoding="utf-8",
-                                          errors="replace", timeout=900, cwd=tmp)
+                                          errors="replace", timeout=900, cwd=tmp, env=cli_env())
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("Claude Code did not answer within 15 minutes.")
                 except OSError as err:
@@ -3035,9 +3044,37 @@ def describe_previous(p: dict) -> str:
     return f"{p.get('company') or '?'} - {p.get('title') or '?'} (prepared {p.get('date') or '?'}{status})"
 
 
+def _list_file_entries(path: Path) -> list[str] | None:
+    """The links and file names in a job-list file, or None if the file is a job description instead."""
+    try:
+        lines = [l.strip() for l in path.read_text(encoding="utf-8", errors="replace").splitlines()]
+    except OSError:
+        return None
+    lines = [l for l in lines if l and not l.startswith("#")]
+    if not lines:
+        return None
+    entries = []
+    for line in lines:
+        links = re.findall(r"https?://.+?(?=https?://|\s|$)", line)
+        if links and not re.sub(r"https?://\S+", "", line).strip():
+            entries.extend(links)  # several links stuck on one line are split apart
+        elif (path.parent / line).is_file() or Path(line).is_file():
+            entries.append(line)
+        else:
+            return None  # ordinary text: this is a job description
+    return entries
+
+
 def _read_job_list(args) -> list[str]:
     jobs = []
     for item in args.job or []:
+        path = Path(item)
+        if not re.match(r"https?://", item, re.I) and path.suffix.lower() == ".txt" and path.is_file():
+            entries = _list_file_entries(path)
+            if entries:  # e.g. "jobpilot tailor jobs.txt": a list of links, not one posting
+                print(f"{item} is a list of {len(entries)} job(s); reading them all (same as --file {item}).")
+                jobs.extend(entries)
+                continue
         jobs.extend(re.findall(r"https?://.+?(?=https?://|\s|$)", item) or [item])
     if args.file:
         path = Path(args.file)
