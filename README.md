@@ -32,13 +32,15 @@ Every application is also added to **`Job_Application_Tracker.xlsx`**, where you
 ## Quick start
 
 1. **Install Python 3.10 or newer** from [python.org](https://www.python.org/downloads/). On Windows, tick *"Add python.exe to PATH"* during installation.
-2. **Get an Anthropic API key** at [console.anthropic.com](https://console.anthropic.com) (Settings > API Keys). API usage is billed separately from a Claude.ai subscription.
+2. **Connect to Claude**, either way:
+   - **Already use Claude Code?** If the `claude` command is installed and signed in (`claude auth login`), JobPilot uses that sign-in. No API key needed.
+   - **Otherwise, get an Anthropic API key** at [console.anthropic.com](https://console.anthropic.com) (Settings > API Keys). API usage is billed separately from a Claude.ai subscription.
 3. **Get JobPilot.** On [the GitHub page](https://github.com/smanish83/JobPilot), click **Code > Download ZIP** and unzip it somewhere easy to find, for example `Documents\JobPilot`. Or, with Git: `git clone https://github.com/smanish83/JobPilot.git`.
 4. **Run the setup** in that folder:
    - Windows: double-click **`setup_windows.bat`**
    - Mac / Linux: open a terminal in this folder and run **`./setup_mac_linux.sh`**
 
-   The guided setup asks for your API key, your current resume and an optional work-authorization line, then checks that everything is ready. No resume handy? Type `sample` to try JobPilot with the included sample resume first.
+   The guided setup finds your Claude Code sign-in or asks for an API key, then your current resume and an optional work-authorization line, then checks that everything is ready. No resume handy? Type `sample` to try JobPilot with the included sample resume first.
 5. **Tailor your first application.** Open a terminal in this folder and run:
    ```
    jobpilot tailor "https://www.linkedin.com/jobs/view/1234567890/"
@@ -74,7 +76,7 @@ Your personal data never goes in this folder's code. Your base resume, configura
 
 - **Always read every document before you send it.** The tool is careful, but you are responsible for what goes to an employer.
 - Job sites sometimes block automatic reading (Indeed often does). When that happens, JobPilot asks you to paste the job description instead.
-- Each application uses the Anthropic API (three model calls, or one when a job is skipped as a duplicate or not a fit), so each one has a small API cost.
+- Each application makes three model calls (one when a job is skipped as a duplicate or not a fit). With an API key, each call has a small API cost; through a Claude Code sign-in, the calls count toward that account's usage limits instead.
 - JobPilot is not affiliated with LinkedIn, Indeed, Anthropic or any job site. Respect each site's terms of use.
 
 ## Contributing

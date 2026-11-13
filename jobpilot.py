@@ -12,6 +12,10 @@ ONE-TIME SETUP
     Check it any time with:  jobpilot check
     Try it first with the sample resume:  jobpilot setup --sample
 
+CONNECTION TO CLAUDE (auth setting, default "auto"; the first one found is used)
+    1. a local API key in the configuration file   2. Claude Code installed and signed in (claude auth login):
+    no API key needed   3. the ANTHROPIC_API_KEY environment variable   4. otherwise JobPilot asks for a key
+
 CONFIGURATION
     jobpilot settings --edit   opens ~/.resume_agent/settings.json:
     documents (cover letter on/off, docx/pdf/both), resume (page limit), conditions (fit score,
@@ -77,11 +81,14 @@ import sys
 from datetime import date
 from pathlib import Path
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 HOME = Path.home() / ".resume_agent"
 SETTINGS_FILE = HOME / "settings.json"
 DEFAULT_SETTINGS = {
-    "anthropic_api_key": "",             # optional: your API key, used when ANTHROPIC_API_KEY is not set
+    "auth": "auto",                      # auto: local key, then Claude Code login, then ANTHROPIC_API_KEY
+                                         # claude_cli: only the Claude Code login; api_key: only an API key
+    "anthropic_api_key": "",             # optional: your API key saved locally (used first in auto)
+    "claude_cli_path": "",               # optional: full path to the claude program if it is not on PATH
     "model": "claude-sonnet-5-5",        # Anthropic model used for every step
     "work_authorization": "",            # e.g. "U.S. Work Authorized | No Visa Sponsorship Needed" ("" = hidden)
     "documents": {
@@ -202,8 +209,13 @@ def max_pages() -> int:
         return 2
 
 
+AUTH_MODES = ("auto", "claude_cli", "api_key")
+
+
 def settings_problems() -> list[str]:
     problems = []
+    if str(cfg("auth") or "auto").strip().lower() not in AUTH_MODES:
+        problems.append(f'auth is "{cfg("auth")}": use "auto", "claude_cli" or "api_key".')
     for kind in ("resume", "cover_letter", "requirements"):
         value = str(cfg(f"documents.{kind}_format") or "docx").strip().lower()
         if value not in DOC_FORMATS:
@@ -877,8 +889,7 @@ def _check_letter(d: dict):
 
 
 def generate(base_resume: str, job_text: str, rules_text: str = "", after_analysis=None) -> dict:
-    import anthropic
-    client = anthropic.Anthropic()  # uses ANTHROPIC_API_KEY
+    client = make_client()
     shared = (f"<base_resume>\n{base_resume}\n</base_resume>\n\n{rules_text}"
               f"<job_posting>\n{job_text}\n</job_posting>\n\n")
 
@@ -965,8 +976,7 @@ def learning_links(topic: dict) -> list[dict]:
 
 def generate_study(data: dict, guide: bool = True, questions: bool = False) -> dict:
     """The study guide and/or interview Q&A for one application (one model call each)."""
-    import anthropic
-    client = anthropic.Anthropic()
+    client = make_client()
     analysis = {k: data.get(k) for k in ("company", "job_title", "job_location", "job_requirements", "gaps", "fit")}
     resume = {k: data.get(k) for k in ("headline", "summary", "skills", "experience", "education",
                                        "certifications", "professional_development")}
@@ -2505,7 +2515,9 @@ def write_default_settings() -> bool:
 
 
 SETTING_HELP = {
-    "anthropic_api_key": 'Your API key, used when ANTHROPIC_API_KEY is not set ("" = use the environment variable)',
+    "auth": 'auto (local key, then Claude Code sign-in, then ANTHROPIC_API_KEY), "claude_cli" or "api_key"',
+    "anthropic_api_key": 'Your API key saved locally; used first ("" = none)',
+    "claude_cli_path": 'Full path to the claude program, if it is not on your PATH ("" = find it)',
     "model": "Anthropic model",
     "work_authorization": 'Line under your contact details ("" hides it)',
     "documents.cover_letter": "Write a cover letter (false also saves one model call)",
@@ -2583,11 +2595,13 @@ def cmd_check(args):
             line(True, "pywin32 (exact page counts from Word)")
         except ImportError:
             line(True, "pywin32 not installed: page counts are estimated (optional: pip install pywin32)")
-    key = api_key()
-    where = "ANTHROPIC_API_KEY" if os.environ.get("ANTHROPIC_API_KEY", "").strip() else "configuration file"
-    line(bool(key), f"API key is set ({where})" + (" (looks valid)" if key.startswith("sk-ant-") else ""),
-         'setx ANTHROPIC_API_KEY "sk-ant-..." then open a new terminal' if sys.platform.startswith("win")
-         else 'export ANTHROPIC_API_KEY="sk-ant-..." in ~/.zshrc or ~/.bashrc'); ok_all &= bool(key)
+    auth = resolve_auth()
+    line(bool(auth), f"Connection to Claude: {describe_auth(auth)}" if auth else "Connection to Claude",
+         "Sign in to Claude Code (claude auth login), or set an API key: see  jobpilot settings --edit"
+         + (' or  setx ANTHROPIC_API_KEY "sk-ant-..."' if sys.platform.startswith("win")
+            else ' or  export ANTHROPIC_API_KEY="sk-ant-..."')); ok_all &= bool(auth)
+    if auth and auth["method"] == "api_key" and not auth["key"].startswith("sk-ant-"):
+        line(False, "The API key does not start with sk-ant-", "Check the key in the Anthropic Console")
     line(BASE_TEXT.exists(), f"Base resume saved ({BASE_TEXT})", 'jobpilot setup --resume "My_Resume.docx"')
     ok_all &= BASE_TEXT.exists()
     line(True, f"Configuration: {SETTINGS_FILE if SETTINGS_FILE.exists() else 'defaults (no file yet)'}")
@@ -2643,11 +2657,15 @@ def cmd_init(args):
     import getpass
     print(f"=== JobPilot {__version__} setup ===\n")
 
-    print("1) Anthropic API key  (create one at https://console.anthropic.com > Settings > API Keys)")
-    key = api_key()
-    if key.startswith("sk-ant-"):
-        print("  Already set. Keeping it.")
+    print("1) Connection to Claude")
+    auth = resolve_auth()
+    if auth:
+        print(f"  Found: {describe_auth(auth)}. Keeping it.")
+        if auth["method"] == "claude_cli":
+            print("  No API key is needed while Claude Code is signed in.")
     else:
+        print("  No local key or Claude Code sign-in found. Either sign in to Claude Code (claude auth login)\n"
+              "  and run  jobpilot init  again, or enter an API key (https://console.anthropic.com > API Keys).")
         try:
             key = getpass.getpass("  Paste your API key (hidden as you type; Enter to skip): ").strip()
         except EOFError:
@@ -2693,28 +2711,228 @@ def cmd_init(args):
     cmd_check(argparse.Namespace())
 
 
+# ---------------------------------------------------------------------------
+# Authentication: a local key, the Claude Code login, or an API key
+# ---------------------------------------------------------------------------
+# auto (default), in this order:
+#   1. local key   - anthropic_api_key saved in your configuration file
+#   2. Claude CLI  - Claude Code installed and signed in (claude auth login): uses that sign-in, e.g. your
+#                    Claude subscription, so no API key is needed
+#   3. API key     - the ANTHROPIC_API_KEY environment variable
+#   4. ask         - in a terminal, JobPilot asks for a key (and can save it); otherwise it explains how
+_AUTH = {}
+_AUTH_LOCK = threading.Lock()
+
+
+def config_key() -> str:
+    return str(cfg("anthropic_api_key") or "").strip()
+
+
+def env_key() -> str:
+    return os.environ.get("ANTHROPIC_API_KEY", "").strip()
+
+
 def api_key() -> str:
-    """ANTHROPIC_API_KEY from the environment, else anthropic_api_key from the configuration file."""
-    return os.environ.get("ANTHROPIC_API_KEY", "").strip() or str(cfg("anthropic_api_key") or "").strip()
+    """The API key JobPilot would use: the local one from the configuration file, else ANTHROPIC_API_KEY."""
+    return config_key() or env_key()
+
+
+def find_claude_cli() -> str | None:
+    """The claude program (Claude Code), from claude_cli_path or PATH, or the usual install places."""
+    configured = str(cfg("claude_cli_path") or "").strip().strip('"')
+    if configured:
+        return configured if Path(configured).exists() else None
+    found = shutil.which("claude")
+    if found:
+        return found
+    home = Path.home()
+    for candidate in (home / ".local" / "bin" / "claude", home / ".claude" / "local" / "claude",
+                      home / ".local" / "bin" / "claude.exe", home / ".claude" / "local" / "claude.exe"):
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def claude_cli_status(exe: str | None = None) -> dict | None:
+    """`claude auth status` as a dict when Claude Code is installed and signed in, else None."""
+    import subprocess
+    exe = exe or find_claude_cli()
+    if not exe:
+        return None
+    try:
+        done = subprocess.run([exe, "auth", "status"], capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    try:
+        status = json.loads(done.stdout or "{}")
+    except json.JSONDecodeError:
+        status = {}
+    if done.returncode != 0 or not status.get("loggedIn", True) or status.get("authMethod") == "none":
+        return None
+    status["exe"] = exe
+    return status
+
+
+def describe_auth(auth: dict) -> str:
+    if auth["method"] == "claude_cli":
+        how = {"claude.ai": "your Claude account sign-in", "oauth_token": "a Claude sign-in token",
+               "api_key": "the API key Claude Code uses", "api_key_helper": "Claude Code's API key helper",
+               "third_party": "Claude Code's cloud provider"}.get(auth.get("authMethod"), "its sign-in")
+        return f"Claude Code CLI ({how})"
+    return {"config": "local API key (configuration file)", "env": "API key (ANTHROPIC_API_KEY)",
+            "prompt": "API key (entered now)"}.get(auth.get("source"), "API key")
+
+
+def resolve_auth(interactive: bool = False) -> dict | None:
+    """Pick how to reach Claude, following the auth setting. Cached for the run."""
+    mode = str(cfg("auth") or "auto").strip().lower()
+    mode = mode if mode in AUTH_MODES else "auto"
+    with _AUTH_LOCK:
+        if _AUTH.get("mode") == mode and _AUTH.get("result"):
+            return _AUTH["result"]
+        result = None
+        if mode in ("auto", "api_key") and config_key():
+            result = {"method": "api_key", "source": "config", "key": config_key()}
+        if result is None and mode in ("auto", "claude_cli"):
+            status = claude_cli_status()
+            if status:
+                result = {"method": "claude_cli", "exe": status["exe"], "authMethod": status.get("authMethod")}
+        if result is None and mode in ("auto", "api_key") and env_key():
+            result = {"method": "api_key", "source": "env", "key": env_key()}
+        if result is None and interactive and mode != "claude_cli":
+            result = _ask_for_key()
+        _AUTH.update(mode=mode, result=result)
+        return result
+
+
+def _ask_for_key() -> dict | None:
+    import getpass
+    if not sys.stdin or not sys.stdin.isatty():
+        return None
+    print("No local API key or Claude Code sign-in was found.")
+    try:
+        key = getpass.getpass("Paste your Anthropic API key (hidden as you type; Enter to cancel): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return None
+    if not key:
+        return None
+    if _ask("Save it in your configuration file so you aren't asked again? [y/N] ", "n").lower().startswith("y"):
+        save_settings(anthropic_api_key=key)
+        print(f"  Saved in {SETTINGS_FILE}. Keep that file private.")
+    return {"method": "api_key", "source": "prompt", "key": key}
 
 
 def check_api_key():
-    key = api_key()
-    if key and not os.environ.get("ANTHROPIC_API_KEY", "").strip():
-        os.environ["ANTHROPIC_API_KEY"] = key  # from the configuration file; the Anthropic client reads it here
-    if not key:
+    """Make sure JobPilot can reach Claude before any work starts (name kept for older scripts)."""
+    auth = resolve_auth(interactive=True)
+    if auth is None:
+        mode = str(cfg("auth") or "auto").strip().lower()
         windows = sys.platform.startswith("win")
-        sys.exit("Your Anthropic API key is not set in this terminal.\n"
-                 + ('  Set it permanently:  setx ANTHROPIC_API_KEY "sk-ant-api03-..."\n'
-                    "  Then close this terminal and open a new one (setx only applies to new windows).\n"
-                    "  Note: 'set' (without x) only lasts until you close the window."
-                    if windows else
-                    '  Add to ~/.zshrc or ~/.bashrc:  export ANTHROPIC_API_KEY="sk-ant-api03-..."\n'
-                    "  Then open a new terminal.")
-                 + "\n  Or put it in your configuration file as \"anthropic_api_key\" (jobpilot settings --edit)."
-                 + "\n  Get a key at https://console.anthropic.com (Settings > API Keys).")
-    if not key.startswith("sk-ant-"):
-        print("Warning: ANTHROPIC_API_KEY does not look like an Anthropic API key (should start with sk-ant-).")
+        lines = ["JobPilot could not find a way to reach Claude."]
+        if mode != "api_key":
+            lines.append("  Option 1, no API key needed: install Claude Code and sign in once:\n"
+                         "    claude auth login\n"
+                         "  (Install: https://code.claude.com/docs/en/setup . If claude is not on your PATH, set\n"
+                         "  \"claude_cli_path\" in the configuration file.)")
+        if mode != "claude_cli":
+            lines.append("  Option 2: an Anthropic API key (https://console.anthropic.com > Settings > API Keys), either\n"
+                         "    in your configuration file as \"anthropic_api_key\"  (jobpilot settings --edit), or\n"
+                         + ('    setx ANTHROPIC_API_KEY "sk-ant-api03-..."   then open a new terminal'
+                            if windows else '    export ANTHROPIC_API_KEY="sk-ant-api03-..."   in ~/.zshrc or ~/.bashrc'))
+        if mode == "claude_cli":
+            lines.append('  (Your configuration has "auth": "claude_cli", so API keys are not used.)')
+        sys.exit("\n".join(lines))
+    if auth["method"] == "api_key":
+        if not auth["key"].startswith("sk-ant-"):
+            print("Warning: the API key does not look like an Anthropic API key (should start with sk-ant-).")
+        os.environ["ANTHROPIC_API_KEY"] = auth["key"]  # the Anthropic client reads it from here
+    log(f"Using: {describe_auth(auth)}")
+    return auth
+
+
+class _Reply:
+    def __init__(self, text: str, stop_reason: str = "end_turn"):
+        self.content = [type("Block", (), {"type": "text", "text": text})()]
+        self.stop_reason = stop_reason
+
+
+class ClaudeCLIClient:
+    """Runs each request through the Claude Code CLI (`claude -p`), with the same small interface JobPilot
+    uses from the Anthropic SDK: client.messages.stream(...).get_final_message()."""
+
+    def __init__(self, exe: str):
+        self.exe = exe
+        self.messages = self
+
+    @staticmethod
+    def _prompt(messages: list[dict]) -> str:
+        if len(messages) == 1:
+            return messages[0]["content"]
+        # A retry: the original request, the reply that had a problem, and what to fix.
+        parts = [messages[0]["content"]]
+        for m in messages[1:]:
+            tag = "your_previous_reply" if m["role"] == "assistant" else "follow_up"
+            parts.append(f"<{tag}>\n{m['content']}\n</{tag}>")
+        return "\n\n".join(parts)
+
+    def stream(self, model: str, max_tokens: int, system: str, messages: list[dict]):
+        client = self
+
+        class _Stream:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def get_final_message(self):
+                return client._run(model, system, client._prompt(messages))
+
+        return _Stream()
+
+    def _run(self, model: str, system: str, prompt: str) -> _Reply:
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="jobpilot-") as tmp:
+            # An empty folder: Claude Code loads no project files (CLAUDE.md, settings, MCP) from here.
+            system_file = Path(tmp) / "system.txt"
+            system_file.write_text(system, encoding="utf-8")
+            base = [self.exe, "-p", "--output-format", "json", "--system-prompt-file", str(system_file),
+                    "--model", model, "--max-turns", "1"]
+            extras = ["--tools", "", "--no-session-persistence", "--disable-slash-commands", "--strict-mcp-config"]
+            for command in (base + extras, base):  # older Claude Code versions may not know every extra flag
+                try:
+                    done = subprocess.run(command, input=prompt, capture_output=True, text=True, encoding="utf-8",
+                                          errors="replace", timeout=900, cwd=tmp)
+                except subprocess.TimeoutExpired:
+                    raise RuntimeError("Claude Code did not answer within 15 minutes.")
+                except OSError as err:
+                    raise RuntimeError(f"Could not start Claude Code ({self.exe}): {err}")
+                if done.returncode != 0 and "unknown option" in (done.stderr or "").lower() and command != base:
+                    continue
+                break
+        try:
+            data = json.loads(done.stdout.strip().splitlines()[-1]) if done.stdout.strip() else {}
+        except (json.JSONDecodeError, IndexError):
+            data = {}
+        if data.get("is_error") or done.returncode != 0 or "result" not in data:
+            detail = data.get("result") or (done.stderr or done.stdout or "no output").strip()[:500]
+            raise RuntimeError(f"Claude Code CLI request failed: {detail}\n"
+                               "  Check the sign-in with:  claude auth status   (sign in again:  claude auth login)")
+        stop = "max_tokens" if data.get("stop_reason") == "max_tokens" else "end_turn"
+        return _Reply(str(data.get("result") or ""), stop)
+
+
+def make_client():
+    """The client for this run: the Claude Code CLI or the Anthropic SDK, as resolve_auth decided."""
+    auth = resolve_auth()
+    if auth and auth["method"] == "claude_cli":
+        return ClaudeCLIClient(auth["exe"])
+    import anthropic
+    if auth and auth["method"] == "api_key":
+        return anthropic.Anthropic(api_key=auth["key"])
+    return anthropic.Anthropic()  # uses ANTHROPIC_API_KEY
 
 
 # ---------------------------------------------------------------------------

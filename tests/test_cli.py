@@ -35,7 +35,7 @@ def test_setup_rejects_missing_file(jp, run):
 
 def test_tailor_without_api_key_explains_how_to_set_it(jp, run, monkeypatch, job_file):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    with pytest.raises(SystemExit, match="API key is not set"):
+    with pytest.raises(SystemExit, match="could not find a way to reach Claude"):
         run("tailor", job_file)
 
 

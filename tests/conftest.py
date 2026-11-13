@@ -25,6 +25,8 @@ sys.path.insert(0, str(ROOT))
 
 import jobpilot  # noqa: E402
 
+REAL_FIND_CLAUDE_CLI = jobpilot.find_claude_cli  # the tests replace it; test_auth.py checks the real one
+
 
 def load_fixture(name: str) -> dict:
     return json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
@@ -106,6 +108,9 @@ def jp(tmp_path, monkeypatch):
     # Page counting through Word or LibreOffice is slow and machine-specific: use the estimate.
     monkeypatch.setattr(jobpilot, "_pages_with_word", lambda path: None)
     monkeypatch.setattr(jobpilot, "_pages_with_libreoffice", lambda path: None)
+    # Never use a Claude Code sign-in that happens to exist on the test machine, and start every test fresh.
+    monkeypatch.setattr(jobpilot, "find_claude_cli", lambda: None)
+    jobpilot._AUTH.clear()
     # Never reach the internet: official-docs links count as working only for these test URLs.
     monkeypatch.setattr(jobpilot, "_url_works", lambda url: url.startswith("https://kubernetes.io/"))
     # PDFs: a tiny stand-in file instead of Word or LibreOffice.

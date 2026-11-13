@@ -9,7 +9,7 @@ Setup takes about 10 minutes. You only do it once.
 | A computer | Windows 10/11, macOS, or Linux |
 | For PDF output (optional) | Microsoft Word on Windows, or [LibreOffice](https://www.libreoffice.org) (free) on any system |
 | Python 3.10 or newer | Free from [python.org/downloads](https://www.python.org/downloads/) |
-| An Anthropic API key | From [console.anthropic.com](https://console.anthropic.com). API usage is pay-as-you-go and billed separately from a Claude.ai subscription. |
+| A way to reach Claude | **Either** Claude Code installed and signed in (no API key needed), **or** an Anthropic API key from [console.anthropic.com](https://console.anthropic.com) (pay-as-you-go, billed separately from a Claude.ai subscription) |
 | Your current resume | A `.docx` (best), `.pdf`, `.md` or `.txt` file |
 | Internet access | To install the libraries and to call the API |
 | Microsoft Word (optional) | To open the documents. On Windows it is also used to count resume pages exactly. |
@@ -33,7 +33,18 @@ Setup takes about 10 minutes. You only do it once.
 
 - Use your package manager, for example `sudo apt install python3 python3-venv`.
 
-## Step 2: Get an Anthropic API key
+## Step 2: Connect to Claude
+
+JobPilot looks for a connection in this order and uses the first one it finds:
+
+1. **A local API key** saved in your configuration file (`anthropic_api_key`).
+2. **Claude Code** (the `claude` command), installed and signed in. JobPilot sends its requests through it, so your Claude Code sign-in (for example your Claude subscription) is used and **no API key is needed**. To set it up, [install Claude Code](https://code.claude.com/docs/en/setup), then run `claude auth login` once. `claude auth status` shows whether you are signed in.
+3. **The `ANTHROPIC_API_KEY` environment variable.**
+4. If none of these is found, JobPilot asks you for an API key (and can save it in the configuration file).
+
+To always use one method, set `"auth"` in the configuration file to `"claude_cli"` or `"api_key"` (the default is `"auto"`, the order above).
+
+**To get an API key** (only if you don't use Claude Code):
 
 1. Sign in at [console.anthropic.com](https://console.anthropic.com) and add a payment method or credits.
 2. Go to **Settings > API Keys > Create Key**.
@@ -58,7 +69,7 @@ chmod +x setup_mac_linux.sh
 
 The setup creates a private Python environment inside the folder (`.venv`), installs the libraries, then starts the **guided setup**, which asks you:
 
-1. **Your API key.** Paste it; it is hidden as you type. On Windows it is saved with `setx`. On Mac/Linux you are asked before it is added to `~/.zshrc` or `~/.bashrc`.
+1. **Your connection to Claude.** If a local key or a signed-in Claude Code is found, it is used and nothing is asked. Otherwise paste an API key; it is hidden as you type. On Windows it is saved with `setx`. On Mac/Linux you are asked before it is added to `~/.zshrc` or `~/.bashrc`.
 2. **Your resume file.** Type the path, or drag the file into the window. To try JobPilot first, type `sample` to use the included sample resume (`examples/sample_resume.docx`, a fictional person), and replace it with yours later.
 3. **A work-authorization line** (optional). It appears under your contact details, for example `U.S. Work Authorized | No Visa Sponsorship Needed`. Press Enter to skip.
 4. **Experience rules** (optional). See HOW_TO_USE.md. You can create them later.
@@ -99,7 +110,8 @@ Delete the JobPilot folder. To remove your personal data too, delete the `.resum
 | Problem | Fix |
 |---|---|
 | `Python was not found` or the Microsoft Store opens | Install Python from python.org and tick **Add python.exe to PATH**, then run the setup again. |
-| `Your Anthropic API key is not set in this terminal` | Close the terminal and open a new one; a saved key only reaches new windows. Still missing? Run `jobpilot init` again. |
+| `JobPilot could not find a way to reach Claude` | Sign in to Claude Code (`claude auth login`), or set an API key. A key saved with `setx` only reaches new terminal windows, so close this one and open a new one. Then run `jobpilot check`. |
+| `Claude Code CLI request failed` | Run `claude auth status`. If you are signed out, run `claude auth login`. If your plan's usage limit is reached, wait, or set `"auth": "api_key"` to use an API key instead. If `claude` is installed somewhere unusual, set `"claude_cli_path"`. |
 | `401` / `authentication_error` | The key is wrong or was deleted. Create a new key in the Console and run `jobpilot init`. |
 | `credit balance is too low` | Add credits in the Anthropic Console (Plans & Billing). |
 | `'jobpilot' is not recognized` | You are not in the JobPilot folder, or you are in PowerShell. Use `.\jobpilot`, or `cd` into the folder first. |

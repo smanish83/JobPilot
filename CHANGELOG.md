@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.6.0 (2026-11-13)
+
+- **Use your Claude Code sign-in.** JobPilot now looks for a connection in this order: a local API key in the configuration file, then Claude Code (`claude`) installed and signed in, then the `ANTHROPIC_API_KEY` environment variable, and only then asks for a key. Through Claude Code no API key is needed: requests run with `claude -p` from an empty temporary folder, with Claude Code's tools turned off, and count toward that account's usage limits. Older Claude Code versions that lack some flags still work.
+- New settings: `auth` (`auto`, `claude_cli` or `api_key`) and `claude_cli_path`. A local `anthropic_api_key` now comes before the environment variable.
+- Every run prints which connection it uses; `jobpilot check` and `jobpilot init` show it too. When nothing is found, the message explains both options.
+- 15 new tests, using a stand-in `claude` program.
+
 ## 2.5.0 (2026-11-12)
 
 - **Results as tables.** A single job ends with a details table (company, job, location, fit, ATS result, keyword coverage, pay, suggested ask, sponsorship, folder and files), the ATS checklist with OK / FIX for each check, and a table of gaps. Several jobs end with one summary table: result, company, job title, fit, ATS, keyword coverage, suggested ask, and the folder or the reason it was skipped (for FIX, the failed checks are named). Tables wrap to the terminal width and use plain ASCII borders, so they show correctly in every terminal.

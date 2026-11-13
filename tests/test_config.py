@@ -74,10 +74,10 @@ def test_api_key_from_configuration_file(jp, fake_model, job_file, run, monkeypa
     assert len(app_folders()) == 1
 
 
-def test_environment_variable_wins_over_the_file(jp, monkeypatch):
+def test_local_key_in_the_file_comes_first(jp, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-env")
     configure(jp, anthropic_api_key="sk-ant-file")
-    assert jp.api_key() == "sk-ant-env"
+    assert jp.api_key() == "sk-ant-file"
 
 
 def test_settings_never_prints_the_whole_key(jp, run, capsys):

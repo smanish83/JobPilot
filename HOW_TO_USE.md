@@ -16,7 +16,7 @@ This guide assumes setup is done (see SETUP.md). Run every command from a termin
 
 | Command | What it does |
 |---|---|
-| `jobpilot init` | Guided setup: API key, resume, work-authorization line |
+| `jobpilot init` | Guided setup: connection to Claude (Claude Code sign-in or API key), resume, work-authorization line |
 | `jobpilot check` | Checks everything is installed and set up |
 | `jobpilot setup --resume "My_Resume.docx"` | Saves (or replaces) your base resume |
 | `jobpilot setup --sample` | Uses the sample resume, so you can try JobPilot before setting up your own |
@@ -219,7 +219,9 @@ Everything you can change lives in one file: `.resume_agent\settings.json` in yo
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `anthropic_api_key` | `""` | Your API key. Used only when the `ANTHROPIC_API_KEY` environment variable is not set. The file is plain text, so keep it private and never share or commit it. |
+| `auth` | `auto` | How JobPilot reaches Claude. `auto`: a local key in this file first, then your Claude Code sign-in, then the `ANTHROPIC_API_KEY` environment variable, then it asks you. `claude_cli`: only Claude Code. `api_key`: only an API key. See SETUP.md, step 2. |
+| `anthropic_api_key` | `""` | Your API key saved locally. When set, it is used first. The file is plain text, so keep it private and never share or commit it. |
+| `claude_cli_path` | `""` | The full path to the `claude` program, only if it isn't found on its own (e.g. `C:\Users\you\.local\bin\claude.exe`) |
 | `model` | `claude-sonnet-5-5` | The Anthropic model used |
 | `work_authorization` | `""` | A line under your contact details (example below). Empty means hidden. When set, the cover letter also says you need no sponsorship. |
 
@@ -330,7 +332,7 @@ This rebuilds the documents (including any study guide and interview Q&A) and re
 ## 14. Honesty and privacy
 
 - JobPilot is instructed never to invent employers, titles, dates, degrees, certifications, tools or metrics. **Still, read everything before sending.**
-- Your resume and the job posting are sent to the Anthropic API to generate the documents. Nothing else is sent anywhere.
+- Your resume and the job posting are sent to Anthropic to generate the documents: directly through the API with an API key, or through Claude Code when you use its sign-in. With Claude Code, each request runs from an empty temporary folder with all of Claude Code's tools turned off, so it only reads what JobPilot sends. Nothing else is sent anywhere.
 - Your personal files stay on your computer, in `.resume_agent` and your `applications` folder. Don't put your API key in shared files.
 
 ## 15. FAQ
@@ -341,4 +343,6 @@ This rebuilds the documents (including any study guide and interview Q&A) and re
 
 **It says "Gap" for something I've done.** Add it to your base resume (or an experience rule) and run `tailor` again.
 
-**How much does it cost?** Each application makes three model calls (two without a cover letter), plus one each for a study guide and an interview Q&A if you ask for them. The exact cost depends on the model and the length of your resume and the posting; check your usage in the Anthropic Console.
+**How much does it cost?** Each application makes three model calls (two without a cover letter), plus one each for a study guide and an interview Q&A if you ask for them. With an API key, the exact cost depends on the model and the length of your resume and the posting; check your usage in the Anthropic Console. Through a Claude Code sign-in there is no API bill: the requests count toward your Claude plan's usage limits.
+
+**Which connection is it using?** Every run prints it (for example `Using: Claude Code CLI (your Claude account sign-in)`), and `jobpilot check` shows it too.
